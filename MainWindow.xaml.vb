@@ -16,10 +16,12 @@ Class MainWindow
             CurrentLanguageInt = 2
         End If
         IO.Directory.SetCurrentDirectory(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location))
+        SanitizeSettings()
         If (My.Settings.ClientVersion = GetClientVersion()) = False Then
             My.Settings.Reset()
             My.Settings.ClientVersion = GetClientVersion()
             My.Settings.Save()
+            My.Settings.Reload()
             If CheckHabboProtocol() = False Then
                 Dim Result As MessageBoxResult = MessageBox.Show(AppTranslator.ProtocolRegAdvice(CurrentLanguageInt), Me.Title, MessageBoxButton.YesNo, MessageBoxImage.Question)
                 If Result = MessageBoxResult.Yes Then
@@ -50,6 +52,27 @@ Class MainWindow
         If RequestedURI = "" = False Then
             StartNewInstanceButton_Click(Nothing, Nothing)
         End If
+    End Sub
+
+    Sub SanitizeSettings()
+        My.Settings.Reload()
+        If String.IsNullOrWhiteSpace(My.Settings.RenderMode) Then
+            My.Settings.RenderMode = "cpu"
+        End If
+        If (My.Settings.RenderMode = "cpu" Or My.Settings.RenderMode = "direct" Or My.Settings.RenderMode = "gpu") = False Then
+            My.Settings.RenderMode = "cpu"
+        End If
+        If String.IsNullOrWhiteSpace(My.Settings.LastInstance) Then
+            My.Settings.LastInstance = 0
+        End If
+        If IsNumeric(My.Settings.LastInstance) = False Then
+            My.Settings.LastInstance = 0
+        End If
+        If String.IsNullOrWhiteSpace(My.Settings.ClientVersion) Then
+            My.Settings.ClientVersion = "null"
+        End If
+        My.Settings.Save()
+        My.Settings.Reload()
     End Sub
 
     Function CheckWritePermissions(Path As String) As Boolean
@@ -122,19 +145,31 @@ Class MainWindow
         End Try
     End Sub
 
-    Private Sub GPURenderButton_Click(sender As Object, e As RoutedEventArgs) Handles GPURenderButton.Click
-        My.Settings.RenderMode = "gpu"
+    Private Sub CPURenderButton_Click(sender As Object, e As RoutedEventArgs) Handles CPURenderButton.Click
+        My.Settings.RenderMode = "cpu"
         My.Settings.Save()
+        My.Settings.Reload()
+        CPURenderButton.IsChecked = True
+        DirectRenderButton.IsChecked = False
+        GPURenderButton.IsChecked = False
     End Sub
 
     Private Sub DirectRenderButton_Click(sender As Object, e As RoutedEventArgs) Handles DirectRenderButton.Click
         My.Settings.RenderMode = "direct"
         My.Settings.Save()
+        My.Settings.Reload()
+        CPURenderButton.IsChecked = False
+        DirectRenderButton.IsChecked = True
+        GPURenderButton.IsChecked = False
     End Sub
 
-    Private Sub CPURenderButton_Click(sender As Object, e As RoutedEventArgs) Handles CPURenderButton.Click
-        My.Settings.RenderMode = "cpu"
+    Private Sub GPURenderButton_Click(sender As Object, e As RoutedEventArgs) Handles GPURenderButton.Click
+        My.Settings.RenderMode = "gpu"
         My.Settings.Save()
+        My.Settings.Reload()
+        CPURenderButton.IsChecked = False
+        DirectRenderButton.IsChecked = False
+        GPURenderButton.IsChecked = True
     End Sub
 
     Private Sub StartNewInstanceButton_Click(sender As Object, e As RoutedEventArgs) Handles StartNewInstanceButton.Click
@@ -149,6 +184,23 @@ Class MainWindow
             Else
                 OriginalClientXML("application")("id").InnerText = "com.sulake.habboair" & NextInstanceInt
             End If
+
+            OriginalClientXML("application")("initialWindow")("width").InnerText = Math.Round(SystemParameters.WorkArea.Width * 0.9)
+            OriginalClientXML("application")("initialWindow")("height").InnerText = Math.Round(SystemParameters.WorkArea.Height * 0.9)
+            Dim ClientWidth = Convert.ToInt32(OriginalClientXML("application")("initialWindow")("width").InnerText)
+            Dim ClientHeight = Convert.ToInt32(OriginalClientXML("application")("initialWindow")("height").InnerText)
+            Dim ClientCenterPosition = GetClientCenterPosition(ClientWidth, ClientHeight)
+            If OriginalClientXML("application")("initialWindow")("x") Is Nothing Then
+                Dim ClientXPosNode = OriginalClientXML.CreateElement("x", OriginalClientXML("application")("initialWindow").NamespaceURI)
+                OriginalClientXML("application")("initialWindow").AppendChild(ClientXPosNode)
+            End If
+            If OriginalClientXML("application")("initialWindow")("y") Is Nothing Then
+                Dim ClientYPosNode = OriginalClientXML.CreateElement("y", OriginalClientXML("application")("initialWindow").NamespaceURI)
+                OriginalClientXML("application")("initialWindow").AppendChild(ClientYPosNode)
+            End If
+            OriginalClientXML("application")("initialWindow")("x").InnerText = ClientCenterPosition.X
+            OriginalClientXML("application")("initialWindow")("y").InnerText = ClientCenterPosition.Y
+
             OriginalClientXML.Save(ClientXMLPath)
             Dim ClientProcess As New Process
             ClientProcess.StartInfo.FileName = GetClientPath() & "\Habbo.exe"
@@ -164,6 +216,24 @@ Class MainWindow
             Environment.Exit(0)
         End If
     End Sub
+
+    Function GetClientCenterPosition(ClientWidth As Integer, ClientHeight As String) As Point
+        With New Window
+            .WindowStartupLocation = WindowStartupLocation.Manual
+            .Width = ClientWidth
+            .Height = ClientHeight
+            .ShowInTaskbar = False
+            .WindowStyle = WindowStyle.None
+            .AllowsTransparency = True
+            .Opacity = 0
+            .Show()
+            .Left = (SystemParameters.WorkArea.Width / 2) - (.ActualWidth / 2) 'Center of PrimaryScreen (x)
+            .Top = (SystemParameters.WorkArea.Height / 2) - (.ActualHeight / 2) 'Center of PrimaryScreen (y)
+            Dim CenterPosition As New Point(.Left, .Top)
+            .Close()
+            Return CenterPosition
+        End With
+    End Function
 
     Public Function RegisterHabboProtocol() As Boolean
         Try
@@ -283,6 +353,7 @@ Class MainWindow
             My.Settings.LastInstance = 0
         End If
         My.Settings.Save()
+        My.Settings.Reload()
         Return My.Settings.LastInstance
     End Function
 
@@ -298,9 +369,9 @@ End Class
 Public Class AppTranslator
     '0=English 1=Spanish 2=Portuguese
     Public Shared ClientNotFound As String() = {
-        "Habbo Client not found.",
-        "Habbo Client no encontrado.",
-        "Habbo Client não encontrado."
+        "Habbo Client not found." & vbNewLine & "You can download it from the Habbo website.",
+        "Habbo Client no encontrado." & vbNewLine & "Puedes descargarlo desde la web de Habbo.",
+        "Habbo Client não encontrado." & vbNewLine & "Você pode baixá-lo do site do Habbo."
     }
     Public Shared AdminRightsError As String() = {
         "You need administrator rights.",
