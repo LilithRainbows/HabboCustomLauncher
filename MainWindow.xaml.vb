@@ -1,5 +1,7 @@
-﻿Imports System.IO
+﻿Imports System.ComponentModel
+Imports System.IO
 Imports System.Security.Principal
+Imports System.Windows.Threading
 Imports System.Xml
 Imports Microsoft.Win32
 
@@ -8,6 +10,9 @@ Class MainWindow
     Public RequestedServer As String = ""
     Public RequestedTicket As String = ""
     Public CurrentLanguageInt As Integer = 0
+    Public WithEvents ClientMaximizerTimer As New DispatcherTimer
+    Public WithEvents ClientMaximizerBW As New ExtendedBackgroundWorker
+    Public ClientProcesses As New List(Of Process)
     Private Sub MainWindow_Loaded(sender As Object, e As RoutedEventArgs) Handles Me.Loaded
         If System.Globalization.CultureInfo.CurrentCulture.Name.ToLower.StartsWith("es") Then
             CurrentLanguageInt = 1
@@ -21,7 +26,6 @@ Class MainWindow
             My.Settings.Reset()
             My.Settings.ClientVersion = GetClientVersion()
             My.Settings.Save()
-            My.Settings.Reload()
             If CheckHabboProtocol() = False Then
                 Dim Result As MessageBoxResult = MessageBox.Show(AppTranslator.ProtocolRegAdvice(CurrentLanguageInt), Me.Title, MessageBoxButton.YesNo, MessageBoxImage.Question)
                 If Result = MessageBoxResult.Yes Then
@@ -55,7 +59,24 @@ Class MainWindow
     End Sub
 
     Sub SanitizeSettings()
-        My.Settings.Reload()
+        Try
+            My.Settings.AppSettingsWorked = True
+            My.Settings.Save()
+            My.Settings.Reload()
+            If My.Settings.AppSettingsWorked = True Then
+                My.Settings.AppSettingsWorked = False
+            Else
+                Throw New Exception("AppSettings not working.")
+            End If
+        Catch
+            If UserIsAdmin() Then
+                MsgBox(AppTranslator.AppSettingsNotWorkingError(CurrentLanguageInt), MsgBoxStyle.Critical, "Error")
+                Environment.Exit(0)
+            Else
+                RestartElevated()
+            End If
+        End Try
+
         If String.IsNullOrWhiteSpace(My.Settings.RenderMode) Then
             My.Settings.RenderMode = "cpu"
         End If
@@ -72,7 +93,6 @@ Class MainWindow
             My.Settings.ClientVersion = "null"
         End If
         My.Settings.Save()
-        My.Settings.Reload()
     End Sub
 
     Function CheckWritePermissions(Path As String) As Boolean
@@ -148,28 +168,16 @@ Class MainWindow
     Private Sub CPURenderButton_Click(sender As Object, e As RoutedEventArgs) Handles CPURenderButton.Click
         My.Settings.RenderMode = "cpu"
         My.Settings.Save()
-        My.Settings.Reload()
-        CPURenderButton.IsChecked = True
-        DirectRenderButton.IsChecked = False
-        GPURenderButton.IsChecked = False
     End Sub
 
     Private Sub DirectRenderButton_Click(sender As Object, e As RoutedEventArgs) Handles DirectRenderButton.Click
         My.Settings.RenderMode = "direct"
         My.Settings.Save()
-        My.Settings.Reload()
-        CPURenderButton.IsChecked = False
-        DirectRenderButton.IsChecked = True
-        GPURenderButton.IsChecked = False
     End Sub
 
     Private Sub GPURenderButton_Click(sender As Object, e As RoutedEventArgs) Handles GPURenderButton.Click
         My.Settings.RenderMode = "gpu"
         My.Settings.Save()
-        My.Settings.Reload()
-        CPURenderButton.IsChecked = False
-        DirectRenderButton.IsChecked = False
-        GPURenderButton.IsChecked = True
     End Sub
 
     Private Sub StartNewInstanceButton_Click(sender As Object, e As RoutedEventArgs) Handles StartNewInstanceButton.Click
@@ -185,11 +193,10 @@ Class MainWindow
                 OriginalClientXML("application")("id").InnerText = "com.sulake.habboair" & NextInstanceInt
             End If
 
-            OriginalClientXML("application")("initialWindow")("width").InnerText = Math.Round(SystemParameters.WorkArea.Width * 0.9)
-            OriginalClientXML("application")("initialWindow")("height").InnerText = Math.Round(SystemParameters.WorkArea.Height * 0.9)
+            OriginalClientXML("application")("initialWindow")("width").InnerText = Math.Round(SystemParameters.WorkArea.Width)
+            OriginalClientXML("application")("initialWindow")("height").InnerText = Math.Round(SystemParameters.WorkArea.Height)
             Dim ClientWidth = Convert.ToInt32(OriginalClientXML("application")("initialWindow")("width").InnerText)
             Dim ClientHeight = Convert.ToInt32(OriginalClientXML("application")("initialWindow")("height").InnerText)
-            Dim ClientCenterPosition = GetClientCenterPosition(ClientWidth, ClientHeight)
             If OriginalClientXML("application")("initialWindow")("x") Is Nothing Then
                 Dim ClientXPosNode = OriginalClientXML.CreateElement("x", OriginalClientXML("application")("initialWindow").NamespaceURI)
                 OriginalClientXML("application")("initialWindow").AppendChild(ClientXPosNode)
@@ -198,8 +205,8 @@ Class MainWindow
                 Dim ClientYPosNode = OriginalClientXML.CreateElement("y", OriginalClientXML("application")("initialWindow").NamespaceURI)
                 OriginalClientXML("application")("initialWindow").AppendChild(ClientYPosNode)
             End If
-            OriginalClientXML("application")("initialWindow")("x").InnerText = ClientCenterPosition.X
-            OriginalClientXML("application")("initialWindow")("y").InnerText = ClientCenterPosition.Y
+            OriginalClientXML("application")("initialWindow")("x").InnerText = 0
+            OriginalClientXML("application")("initialWindow")("y").InnerText = 0
 
             OriginalClientXML.Save(ClientXMLPath)
             Dim ClientProcess As New Process
@@ -209,31 +216,16 @@ Class MainWindow
                 ClientProcess.StartInfo.Arguments = "-server " & RequestedServer & " -ticket " & RequestedTicket
             End If
             ClientProcess.Start()
+            ClientProcesses.Add(ClientProcess)
+            ClientMaximizerTimer.Interval = TimeSpan.FromMilliseconds(500)
+            ClientMaximizerTimer.Start()
         Catch ex As Exception
             MsgBox(AppTranslator.ClientOpenError(CurrentLanguageInt), MsgBoxStyle.Critical, "Error")
+            If RequestedURI = "" = False Then
+                Environment.Exit(0)
+            End If
         End Try
-        If RequestedURI = "" = False Then
-            Environment.Exit(0)
-        End If
     End Sub
-
-    Function GetClientCenterPosition(ClientWidth As Integer, ClientHeight As String) As Point
-        With New Window
-            .WindowStartupLocation = WindowStartupLocation.Manual
-            .Width = ClientWidth
-            .Height = ClientHeight
-            .ShowInTaskbar = False
-            .WindowStyle = WindowStyle.None
-            .AllowsTransparency = True
-            .Opacity = 0
-            .Show()
-            .Left = (SystemParameters.WorkArea.Width / 2) - (.ActualWidth / 2) 'Center of PrimaryScreen (x)
-            .Top = (SystemParameters.WorkArea.Height / 2) - (.ActualHeight / 2) 'Center of PrimaryScreen (y)
-            Dim CenterPosition As New Point(.Left, .Top)
-            .Close()
-            Return CenterPosition
-        End With
-    End Function
 
     Public Function RegisterHabboProtocol() As Boolean
         Try
@@ -353,7 +345,6 @@ Class MainWindow
             My.Settings.LastInstance = 0
         End If
         My.Settings.Save()
-        My.Settings.Reload()
         Return My.Settings.LastInstance
     End Function
 
@@ -364,6 +355,57 @@ Class MainWindow
             UnregisterHabboProtocol()
         End If
         UpdateProtocolButton()
+    End Sub
+
+    <System.Runtime.InteropServices.DllImport("user32.dll")>
+    Private Shared Function ShowWindow(hWnd As System.IntPtr, nCmdShow As Integer) As Integer
+    End Function
+    Enum ShowWindowCommands As Integer
+        SW_SHOWNORMAL = 1
+        SW_SHOWMAXIMIZED = 3
+        SW_RESTORE = 9
+    End Enum
+    <System.Runtime.InteropServices.DllImport("user32.dll")>
+    Private Shared Function IsZoomed(hWnd As IntPtr) As Boolean
+    End Function
+
+    Private Sub ClientMaximizerTimer_Tick(sender As Object, e As EventArgs) Handles ClientMaximizerTimer.Tick
+        If ClientMaximizerBW.IsBusy = False Then
+            ClientMaximizerBW.RunWorkerAsync()
+        End If
+    End Sub
+
+    Private Sub ClientMaximizerBW_DoWork(sender As Object, e As DoWorkEventArgs) Handles ClientMaximizerBW.DoWork
+        Try
+            For Each ClientProcess In ClientProcesses
+                If ClientProcess.HasExited Then
+                    ClientProcesses.Remove(ClientProcess)
+                    Exit For
+                Else
+                    If IsZoomed(ClientProcess.MainWindowHandle) Then
+                        ClientProcesses.Remove(ClientProcess)
+                        Exit For
+                    Else
+                        ShowWindow(ClientProcess.MainWindowHandle, ShowWindowCommands.SW_SHOWMAXIMIZED)
+                    End If
+                End If
+            Next
+            If ClientProcesses.Count = 0 Then
+                ClientMaximizerTimer.Stop()
+                If RequestedURI = "" = False Then
+                    Environment.Exit(0)
+                End If
+            End If
+        Catch
+            Console.WriteLine("ClientsMaximizer error")
+            If RequestedURI = "" = False Then
+                Environment.Exit(0)
+            End If
+        End Try
+    End Sub
+
+    Private Sub MainWindow_Closing(sender As Object, e As CancelEventArgs) Handles Me.Closing
+        ClientMaximizerBW.CancelImmediately()
     End Sub
 End Class
 Public Class AppTranslator
@@ -422,5 +464,10 @@ Public Class AppTranslator
         "Now you can access from the new Habbo web button without having to open this program." & vbNewLine & "You don't need to do anything else.",
         "Ahora podrás acceder desde el nuevo botón de la web de Habbo sin necesidad de abrir este programa." & vbNewLine & "No necesitas hacer nada mas.",
         "Agora podes aceder desde o novo botão da web do Habbo sem a necessidade de abrir este programa." & vbNewLine & "Você não precisa fazer mais nada."
+    }
+    Public Shared AppSettingsNotWorkingError As String() = {
+        "Something is blocking access to application settings.",
+        "Algo esta bloqueando el acceso a las opciones de la aplicacion.",
+        "Algo está bloqueando o acesso às configurações do aplicativo."
     }
 End Class

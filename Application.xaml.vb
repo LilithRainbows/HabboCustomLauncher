@@ -21,6 +21,9 @@
                     NewMainWindow.RequestedTicket = RequestedTicket
                     NewMainWindow.RequestedServer = RequestedServer.Remove(0, 2)
                     NewMainWindow.RequestedURI = e.Args(0)
+                    NewMainWindow.WindowStyle = WindowStyle.None
+                    NewMainWindow.AllowsTransparency = True
+                    NewMainWindow.Opacity = 0
                 End If
             End If
         Catch

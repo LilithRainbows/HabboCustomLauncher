@@ -88,6 +88,18 @@ Partial Friend NotInheritable Class MySettings
             Me("ClientVersion") = value
         End Set
     End Property
+    
+    <Global.System.Configuration.UserScopedSettingAttribute(),  _
+     Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
+     Global.System.Configuration.DefaultSettingValueAttribute("False")>  _
+    Public Property AppSettingsWorked() As Boolean
+        Get
+            Return CType(Me("AppSettingsWorked"),Boolean)
+        End Get
+        Set
+            Me("AppSettingsWorked") = value
+        End Set
+    End Property
 End Class
 
 Namespace My
