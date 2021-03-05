@@ -193,10 +193,18 @@ Class MainWindow
                 OriginalClientXML("application")("id").InnerText = "com.sulake.habboair" & NextInstanceInt
             End If
 
-            OriginalClientXML("application")("initialWindow")("width").InnerText = Math.Round(SystemParameters.WorkArea.Width)
-            OriginalClientXML("application")("initialWindow")("height").InnerText = Math.Round(SystemParameters.WorkArea.Height)
-            Dim ClientWidth = Convert.ToInt32(OriginalClientXML("application")("initialWindow")("width").InnerText)
-            Dim ClientHeight = Convert.ToInt32(OriginalClientXML("application")("initialWindow")("height").InnerText)
+            Dim SystemWorkAreaWidth = Math.Round(SystemParameters.WorkArea.Width)
+            Dim SystemWorkAreaHeight = Math.Round(SystemParameters.WorkArea.Height)
+            If SystemWorkAreaWidth < 1024 Then
+                OriginalClientXML("application")("initialWindow")("width").InnerText = 1024
+            Else
+                OriginalClientXML("application")("initialWindow")("width").InnerText = SystemWorkAreaWidth
+            End If
+            If SystemWorkAreaHeight < 768 Then
+                OriginalClientXML("application")("initialWindow")("height").InnerText = 768
+            Else
+                OriginalClientXML("application")("initialWindow")("height").InnerText = SystemWorkAreaHeight
+            End If
             If OriginalClientXML("application")("initialWindow")("x") Is Nothing Then
                 Dim ClientXPosNode = OriginalClientXML.CreateElement("x", OriginalClientXML("application")("initialWindow").NamespaceURI)
                 OriginalClientXML("application")("initialWindow").AppendChild(ClientXPosNode)
