@@ -13,6 +13,7 @@ Class MainWindow
     Public WithEvents ClientMaximizerTimer As New DispatcherTimer
     Public WithEvents ClientMaximizerBW As New ExtendedBackgroundWorker
     Public ClientProcesses As New List(Of Process)
+    Public LoadingWindow As LoadingWindow
     Private Sub MainWindow_Loaded(sender As Object, e As RoutedEventArgs) Handles Me.Loaded
         If System.Globalization.CultureInfo.CurrentCulture.Name.ToLower.StartsWith("es") Then
             CurrentLanguageInt = 1
@@ -54,6 +55,8 @@ Class MainWindow
             End If
         End If
         If RequestedURI = "" = False Then
+            LoadingWindow = New LoadingWindow(AppTranslator.LoadingValue(CurrentLanguageInt))
+            LoadingWindow.Show()
             StartNewInstanceButton_Click(Nothing, Nothing)
         End If
     End Sub
@@ -228,6 +231,7 @@ Class MainWindow
             ClientMaximizerTimer.Interval = TimeSpan.FromMilliseconds(500)
             ClientMaximizerTimer.Start()
         Catch ex As Exception
+            LoadingWindow.Close()
             MsgBox(AppTranslator.ClientOpenError(CurrentLanguageInt), MsgBoxStyle.Critical, "Error")
             If RequestedURI = "" = False Then
                 Environment.Exit(0)
@@ -391,6 +395,11 @@ Class MainWindow
                     Exit For
                 Else
                     If IsZoomed(ClientProcess.MainWindowHandle) Then
+                        Try
+                            ClientProcess.PriorityClass = ProcessPriorityClass.RealTime
+                        Catch
+                            Console.WriteLine("Client priority set error")
+                        End Try
                         ClientProcesses.Remove(ClientProcess)
                         Exit For
                     Else
@@ -477,5 +486,10 @@ Public Class AppTranslator
         "Something is blocking access to application settings.",
         "Algo esta bloqueando el acceso a las opciones de la aplicacion.",
         "Algo está bloqueando o acesso às configurações do aplicativo."
+    }
+    Public Shared LoadingValue As String() = {
+        "Loading Habbo",
+        "Cargando Habbo",
+        "Carregando Habbo"
     }
 End Class
