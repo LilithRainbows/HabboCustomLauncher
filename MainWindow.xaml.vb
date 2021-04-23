@@ -120,21 +120,28 @@ Class MainWindow
     End Function
 
     Function GetClientPath() As String
-        Dim ProgramFilesAppPath As String = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) & "\Sulake\Habbo Launcher\HabboFlash"
+        Dim LocalAppDataPath As String = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) & "\Sulake\Habbo Launcher\HabboFlash"
+        Dim AppDataPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) & "\Habbo Launcher\downloads\air"
+        AppDataPath += "\" & IO.Directory.GetDirectories(AppDataPath).Max(Function(d) New DirectoryInfo(d).Name).First
         If IO.Directory.Exists("META-INF\AIR") Then
             Return Directory.GetCurrentDirectory
         End If
-        If Directory.Exists(ProgramFilesAppPath & "\META-INF\AIR") Then
-            Return ProgramFilesAppPath
+        If Directory.Exists(AppDataPath & "\META-INF\AIR") Then
+            Return AppDataPath
+        End If
+        'To be discontinued.
+        If Directory.Exists(LocalAppDataPath & "\META-INF\AIR") Then
+            Return LocalAppDataPath
         End If
         If Directory.Exists(GetClientShortcutTarget() & "\META-INF\AIR") Then
             Return GetClientShortcutTarget()
         End If
+        '//
         MsgBox(AppTranslator.ClientNotFound(CurrentLanguageInt), MsgBoxStyle.Critical, "Error")
         Environment.Exit(0)
     End Function
 
-    Private Function GetClientShortcutTarget() As String
+    Private Function GetClientShortcutTarget() As String 'This function will be discontinued.
         Try
             Dim FilePath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) & "\Microsoft\Windows\Start Menu\Programs\Sulake\Habbo\Habbo Launcher.lnk"
             Dim FileContent As String = IO.File.ReadAllText(FilePath, Text.Encoding.UTF8)
