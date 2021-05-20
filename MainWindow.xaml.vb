@@ -120,25 +120,29 @@ Class MainWindow
     End Function
 
     Function GetClientPath() As String
-        Dim LocalAppDataPath As String = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) & "\Sulake\Habbo Launcher\HabboFlash"
-        Dim AppDataPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) & "\Habbo Launcher\downloads\air"
-        AppDataPath += "\" & IO.Directory.GetDirectories(AppDataPath).Max(Function(d) New DirectoryInfo(d).Name).First
-        If IO.Directory.Exists("META-INF\AIR") Then
-            Return Directory.GetCurrentDirectory
-        End If
-        If Directory.Exists(AppDataPath & "\META-INF\AIR") Then
-            Return AppDataPath
-        End If
-        'To be discontinued.
-        If Directory.Exists(LocalAppDataPath & "\META-INF\AIR") Then
-            Return LocalAppDataPath
-        End If
-        If Directory.Exists(GetClientShortcutTarget() & "\META-INF\AIR") Then
-            Return GetClientShortcutTarget()
-        End If
-        '//
-        MsgBox(AppTranslator.ClientNotFound(CurrentLanguageInt), MsgBoxStyle.Critical, "Error")
-        Environment.Exit(0)
+        Try
+            Dim LocalAppDataPath As String = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) & "\Sulake\Habbo Launcher\HabboFlash"
+            Dim AppDataPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) & "\Habbo Launcher\downloads\air"
+            AppDataPath += "\" & IO.Directory.GetDirectories(AppDataPath).Max(Function(d) New DirectoryInfo(d).Name)
+            If IO.Directory.Exists("META-INF\AIR") Then
+                Return Directory.GetCurrentDirectory
+            End If
+            If Directory.Exists(AppDataPath & "\META-INF\AIR") Then
+                Return AppDataPath
+            End If
+            'To be discontinued.
+            If Directory.Exists(LocalAppDataPath & "\META-INF\AIR") Then
+                Return LocalAppDataPath
+            End If
+            If Directory.Exists(GetClientShortcutTarget() & "\META-INF\AIR") Then
+                Return GetClientShortcutTarget()
+            End If
+            '//
+            Throw New Exception("Client not found")
+        Catch
+            MsgBox(AppTranslator.ClientNotFound(CurrentLanguageInt), MsgBoxStyle.Critical, "Error")
+            Environment.Exit(0)
+        End Try
     End Function
 
     Private Function GetClientShortcutTarget() As String 'This function will be discontinued.
@@ -200,7 +204,7 @@ Class MainWindow
             If NextInstanceInt = 0 Then
                 OriginalClientXML("application")("id").InnerText = "com.sulake.habboair"
             Else
-                OriginalClientXML("application")("id").InnerText = "com.sulake.habboair" & NextInstanceInt
+                OriginalClientXML("application")("id").InnerText = "com.sulake.habboair-" & NextInstanceInt 'Random will be better but ... maybe later xD
             End If
 
             Dim SystemWorkAreaWidth = Math.Round(SystemParameters.WorkArea.Width)
