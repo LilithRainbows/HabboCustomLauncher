@@ -283,7 +283,7 @@ Public Class AppTranslator
         "Registrar Habbo Protocol"
     }
     Public Shared UnregisterProtocol As String() = {
-        "Register Habbo Protocol",
+        "Unregister Habbo Protocol",
         "Eliminar Habbo Protocol",
         "Remover Habbo Protocol"
     }
