@@ -22,91 +22,15 @@ Class MainWindow
             CurrentLanguageInt = 2
         End If
         IO.Directory.SetCurrentDirectory(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location))
-        SanitizeSettings()
-        If (My.Settings.ClientVersion = GetClientVersion()) = False Then
-            My.Settings.Reset()
-            My.Settings.ClientVersion = GetClientVersion()
-            My.Settings.Save()
-            If CheckHabboProtocol() = False Then
-                Dim Result As MessageBoxResult = MessageBox.Show(AppTranslator.ProtocolRegAdvice(CurrentLanguageInt), Me.Title, MessageBoxButton.YesNo, MessageBoxImage.Question)
-                If Result = MessageBoxResult.Yes Then
-                    If RegisterHabboProtocol() = True Then
-                        MsgBox(AppTranslator.ProtocolRegAdviceOK(CurrentLanguageInt), MsgBoxStyle.Information, Me.Title)
-                        Environment.Exit(0)
-                    End If
-                End If
-            End If
-        End If
-        If My.Settings.RenderMode = "cpu" Then
-            CPURenderButton.IsChecked = True
-        End If
-        If My.Settings.RenderMode = "direct" Then
-            DirectRenderButton.IsChecked = True
-        End If
-        If My.Settings.RenderMode = "gpu" Then
-            GPURenderButton.IsChecked = True
-        End If
         StartNewInstanceButton.Content = AppTranslator.NewInstance(CurrentLanguageInt)
         UpdateProtocolButton()
         FixWindowsTLS()
-        If CheckWritePermissions(GetClientPath) = False Then
-            If UserIsAdmin() = False Then
-                RestartElevated()
-            End If
-        End If
         If RequestedURI = "" = False Then
             LoadingWindow = New LoadingWindow(AppTranslator.LoadingValue(CurrentLanguageInt))
             LoadingWindow.Show()
             StartNewInstanceButton_Click(Nothing, Nothing)
         End If
     End Sub
-
-    Sub SanitizeSettings()
-        Try
-            My.Settings.AppSettingsWorked = True
-            My.Settings.Save()
-            My.Settings.Reload()
-            If My.Settings.AppSettingsWorked = True Then
-                My.Settings.AppSettingsWorked = False
-            Else
-                Throw New Exception("AppSettings not working.")
-            End If
-        Catch
-            If UserIsAdmin() Then
-                MsgBox(AppTranslator.AppSettingsNotWorkingError(CurrentLanguageInt), MsgBoxStyle.Critical, "Error")
-                Environment.Exit(0)
-            Else
-                RestartElevated()
-            End If
-        End Try
-
-        If String.IsNullOrWhiteSpace(My.Settings.RenderMode) Then
-            My.Settings.RenderMode = "cpu"
-        End If
-        If (My.Settings.RenderMode = "cpu" Or My.Settings.RenderMode = "direct" Or My.Settings.RenderMode = "gpu") = False Then
-            My.Settings.RenderMode = "cpu"
-        End If
-        If String.IsNullOrWhiteSpace(My.Settings.LastInstance) Then
-            My.Settings.LastInstance = 0
-        End If
-        If IsNumeric(My.Settings.LastInstance) = False Then
-            My.Settings.LastInstance = 0
-        End If
-        If String.IsNullOrWhiteSpace(My.Settings.ClientVersion) Then
-            My.Settings.ClientVersion = "null"
-        End If
-        My.Settings.Save()
-    End Sub
-
-    Function CheckWritePermissions(Path As String) As Boolean
-        Try
-            IO.File.WriteAllText(Path & "\LauncherPermissionTEST", "")
-            IO.File.Delete(Path & "\LauncherPermissionTEST")
-            Return True
-        Catch
-            Return False
-        End Try
-    End Function
 
     Function GetClientVersion() As String
         Try
@@ -130,14 +54,6 @@ Class MainWindow
             If Directory.Exists(AppDataPath & "\META-INF\AIR") Then
                 Return AppDataPath
             End If
-            'To be discontinued.
-            If Directory.Exists(LocalAppDataPath & "\META-INF\AIR") Then
-                Return LocalAppDataPath
-            End If
-            If Directory.Exists(GetClientShortcutTarget() & "\META-INF\AIR") Then
-                Return GetClientShortcutTarget()
-            End If
-            '//
             Throw New Exception("Client not found")
         Catch
             MsgBox(AppTranslator.ClientNotFound(CurrentLanguageInt), MsgBoxStyle.Critical, "Error")
@@ -145,92 +61,8 @@ Class MainWindow
         End Try
     End Function
 
-    Private Function GetClientShortcutTarget() As String 'This function will be discontinued.
-        Try
-            Dim FilePath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) & "\Microsoft\Windows\Start Menu\Programs\Sulake\Habbo\Habbo Launcher.lnk"
-            Dim FileContent As String = IO.File.ReadAllText(FilePath, Text.Encoding.UTF8)
-            FileContent = FileContent.Remove(FileContent.LastIndexOf("\HabboLauncher.exe"))
-            FileContent = FileContent.Remove(0, FileContent.LastIndexOf(":\") - 1)
-            Return FileContent & "\HabboFlash"
-        Catch
-            Return ""
-        End Try
-    End Function
-
-    Function UserIsAdmin() As Boolean
-        Dim identity As WindowsIdentity = WindowsIdentity.GetCurrent()
-        Dim principal As WindowsPrincipal = New WindowsPrincipal(identity)
-        Return principal.IsInRole(WindowsBuiltInRole.Administrator)
-    End Function
-
-    Private Sub RestartElevated()
-        Try
-            Dim info As ProcessStartInfo = New ProcessStartInfo(System.Reflection.Assembly.GetExecutingAssembly().Location)
-            info.UseShellExecute = True
-            info.Verb = "runas"
-            If RequestedURI = "" = False Then
-                info.Arguments = RequestedURI
-            End If
-            Process.Start(info)
-            Environment.Exit(0)
-        Catch
-            MsgBox(AppTranslator.AdminRightsError(CurrentLanguageInt), MsgBoxStyle.Critical, "Error")
-            Environment.Exit(0)
-        End Try
-    End Sub
-
-    Private Sub CPURenderButton_Click(sender As Object, e As RoutedEventArgs) Handles CPURenderButton.Click
-        My.Settings.RenderMode = "cpu"
-        My.Settings.Save()
-    End Sub
-
-    Private Sub DirectRenderButton_Click(sender As Object, e As RoutedEventArgs) Handles DirectRenderButton.Click
-        My.Settings.RenderMode = "direct"
-        My.Settings.Save()
-    End Sub
-
-    Private Sub GPURenderButton_Click(sender As Object, e As RoutedEventArgs) Handles GPURenderButton.Click
-        My.Settings.RenderMode = "gpu"
-        My.Settings.Save()
-    End Sub
-
     Private Sub StartNewInstanceButton_Click(sender As Object, e As RoutedEventArgs) Handles StartNewInstanceButton.Click
         Try
-            Dim ClientXMLPath As String = GetClientPath() & "\META-INF\AIR\application.xml"
-            Dim OriginalClientXML = New XmlDocument()
-            OriginalClientXML.Load(ClientXMLPath)
-            OriginalClientXML("application")("initialWindow")("renderMode").InnerText = My.Settings.RenderMode
-            Dim NextInstanceInt = GetNextInstanceInt()
-            If NextInstanceInt = 0 Then
-                OriginalClientXML("application")("id").InnerText = "com.sulake.habboair"
-            Else
-                OriginalClientXML("application")("id").InnerText = "com.sulake.habboair-" & NextInstanceInt 'Random will be better but ... maybe later xD
-            End If
-
-            Dim SystemWorkAreaWidth = Math.Round(SystemParameters.WorkArea.Width)
-            Dim SystemWorkAreaHeight = Math.Round(SystemParameters.WorkArea.Height)
-            If SystemWorkAreaWidth < 1024 Then
-                OriginalClientXML("application")("initialWindow")("width").InnerText = 1024
-            Else
-                OriginalClientXML("application")("initialWindow")("width").InnerText = SystemWorkAreaWidth
-            End If
-            If SystemWorkAreaHeight < 768 Then
-                OriginalClientXML("application")("initialWindow")("height").InnerText = 768
-            Else
-                OriginalClientXML("application")("initialWindow")("height").InnerText = SystemWorkAreaHeight
-            End If
-            If OriginalClientXML("application")("initialWindow")("x") Is Nothing Then
-                Dim ClientXPosNode = OriginalClientXML.CreateElement("x", OriginalClientXML("application")("initialWindow").NamespaceURI)
-                OriginalClientXML("application")("initialWindow").AppendChild(ClientXPosNode)
-            End If
-            If OriginalClientXML("application")("initialWindow")("y") Is Nothing Then
-                Dim ClientYPosNode = OriginalClientXML.CreateElement("y", OriginalClientXML("application")("initialWindow").NamespaceURI)
-                OriginalClientXML("application")("initialWindow").AppendChild(ClientYPosNode)
-            End If
-            OriginalClientXML("application")("initialWindow")("x").InnerText = 0
-            OriginalClientXML("application")("initialWindow")("y").InnerText = 0
-
-            OriginalClientXML.Save(ClientXMLPath)
             Dim ClientProcess As New Process
             ClientProcess.StartInfo.FileName = GetClientPath() & "\Habbo.exe"
             ClientProcess.StartInfo.WorkingDirectory = GetClientPath()
@@ -321,6 +153,12 @@ Class MainWindow
         End Try
     End Sub
 
+    Function UserIsAdmin() As Boolean
+        Dim identity As WindowsIdentity = WindowsIdentity.GetCurrent()
+        Dim principal As WindowsPrincipal = New WindowsPrincipal(identity)
+        Return principal.IsInRole(WindowsBuiltInRole.Administrator)
+    End Function
+
     Function UpdateProtocolButton()
         If CheckHabboProtocol() Then
             RegisterAppProtocolButton.Content = AppTranslator.UnregisterProtocol(CurrentLanguageInt)
@@ -345,30 +183,6 @@ Class MainWindow
         Catch
             Return False
         End Try
-    End Function
-
-    Function GetNextInstanceInt() As Integer
-        Dim HabboProcessCount As Integer = 0
-        For Each HabboProcess In Process.GetProcessesByName("Habbo")
-            Try
-                If Path.GetDirectoryName(HabboProcess.MainModule.FileName) = GetClientPath() Then
-                    HabboProcessCount += 1
-                End If
-            Catch
-                HabboProcessCount += 1
-            End Try
-        Next
-        If HabboProcessCount > 0 Then
-            If HabboProcessCount > My.Settings.LastInstance + 1 Then
-                My.Settings.LastInstance = HabboProcessCount + 1
-            Else
-                My.Settings.LastInstance += 1
-            End If
-        Else
-            My.Settings.LastInstance = 0
-        End If
-        My.Settings.Save()
-        Return My.Settings.LastInstance
     End Function
 
     Private Sub RegisterAppProtocolButton_Click(sender As Object, e As RoutedEventArgs) Handles RegisterAppProtocolButton.Click
@@ -443,11 +257,6 @@ Public Class AppTranslator
         "Habbo Client no encontrado." & vbNewLine & "Puedes descargarlo desde la web de Habbo.",
         "Habbo Client não encontrado." & vbNewLine & "Você pode baixá-lo do site do Habbo."
     }
-    Public Shared AdminRightsError As String() = {
-        "You need administrator rights.",
-        "Necesitas permisos de administrador.",
-        "Você precisa de permissões de administrador."
-    }
     Public Shared TLSFixAdminRightsError As String() = {
         "You must run the program as an administrator to enable TLS 1.2 on your system.",
         "Debes ejecutar el programa como administrador para habilitar TLS 1.2 en tu sistema.",
@@ -482,21 +291,6 @@ Public Class AppTranslator
         "Start new instance",
         "Iniciar nueva instancia",
         "Iniciar nova instância"
-    }
-    Public Shared ProtocolRegAdvice As String() = {
-        "Do you want to register Habbo Protocol for easy access from the new Habbo web button?",
-        "Quieres registrar Habbo Protocol para poder acceder fácilmente desde el nuevo botón de la web de Habbo?",
-        "Deseja registrar o Habbo Protocol para poder acessar facilmente a partir do novo botão no site do Habbo?"
-    }
-    Public Shared ProtocolRegAdviceOK As String() = {
-        "Now you can access from the new Habbo web button without having to open this program." & vbNewLine & "You don't need to do anything else.",
-        "Ahora podrás acceder desde el nuevo botón de la web de Habbo sin necesidad de abrir este programa." & vbNewLine & "No necesitas hacer nada mas.",
-        "Agora podes aceder desde o novo botão da web do Habbo sem a necessidade de abrir este programa." & vbNewLine & "Você não precisa fazer mais nada."
-    }
-    Public Shared AppSettingsNotWorkingError As String() = {
-        "Something is blocking access to application settings.",
-        "Algo esta bloqueando el acceso a las opciones de la aplicacion.",
-        "Algo está bloqueando o acesso às configurações do aplicativo."
     }
     Public Shared LoadingValue As String() = {
         "Loading Habbo",
