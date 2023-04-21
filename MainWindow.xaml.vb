@@ -21,7 +21,7 @@ Class MainWindow
         If System.Globalization.CultureInfo.CurrentCulture.Name.ToLower.StartsWith("pt") Then
             CurrentLanguageInt = 2
         End If
-        IO.Directory.SetCurrentDirectory(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location))
+        Directory.SetCurrentDirectory(GetExecutableDirectory)
         StartNewInstanceButton.Content = AppTranslator.NewInstance(CurrentLanguageInt)
         UpdateProtocolButton()
         FixWindowsTLS()
@@ -31,6 +31,10 @@ Class MainWindow
             StartNewInstanceButton_Click(Nothing, Nothing)
         End If
     End Sub
+
+    Function GetExecutableDirectory() As String
+        Return Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName)
+    End Function
 
     Function GetClientVersion() As String
         Try
@@ -45,10 +49,9 @@ Class MainWindow
 
     Function GetClientPath() As String
         Try
-            Dim LocalAppDataPath As String = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) & "\Sulake\Habbo Launcher\HabboFlash"
             Dim AppDataPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) & "\Habbo Launcher\downloads\air"
-            AppDataPath += "\" & IO.Directory.GetDirectories(AppDataPath).Max(Function(d) New DirectoryInfo(d).Name)
-            If IO.Directory.Exists("META-INF\AIR") Then
+            AppDataPath += "\" & Directory.GetDirectories(AppDataPath).Max(Function(d) New DirectoryInfo(d).Name)
+            If Directory.Exists("META-INF\AIR") Then
                 Return Directory.GetCurrentDirectory
             End If
             If Directory.Exists(AppDataPath & "\META-INF\AIR") Then
