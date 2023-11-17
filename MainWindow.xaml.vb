@@ -48,18 +48,19 @@ Class MainWindow
     End Function
 
     Function GetClientPath() As String
+        Directory.SetCurrentDirectory(GetExecutableDirectory)
         Try
-            Dim AppDataPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) & "\Habbo Launcher\downloads\air"
-            AppDataPath += "\" & Directory.GetDirectories(AppDataPath).Max(Function(d) New DirectoryInfo(d).Name)
             If Directory.Exists("META-INF\AIR") Then
                 Return Directory.GetCurrentDirectory
             End If
+            Dim AppDataPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) & "\Habbo Launcher\downloads\air"
+            AppDataPath += "\" & Directory.GetDirectories(AppDataPath).Max(Function(d) New DirectoryInfo(d).Name)
             If Directory.Exists(AppDataPath & "\META-INF\AIR") Then
                 Return AppDataPath
             End If
             Throw New Exception("Client not found")
         Catch
-            MsgBox(AppTranslator.ClientNotFound(CurrentLanguageInt), MsgBoxStyle.Critical, "Error")
+            MsgBox(AppTranslator.ClientNotFound(CurrentLanguageInt) & vbNewLine & vbNewLine & "Current path:" & vbNewLine & Directory.GetCurrentDirectory, MsgBoxStyle.Critical, "Error")
             Environment.Exit(0)
         End Try
     End Function
