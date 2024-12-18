@@ -1,17 +1,20 @@
-Imports System.Globalization
 Imports System.IO
 Imports System.IO.Compression
+Imports System.IO.Pipes
 Imports System.Net.Http
 Imports System.Reflection
 Imports System.Runtime.InteropServices
 Imports System.Security.Principal
 Imports System.Text.Json
+Imports System.Threading
 Imports Avalonia.Controls
 Imports Avalonia.Interactivity
 Imports Avalonia.Markup.Xaml
 Imports Avalonia.Media
 Imports Avalonia.Platform
+Imports Avalonia.Threading
 Imports Microsoft.Win32
+Imports SkiaSharp
 
 'PROBLEMA: Como se puede hacer para que se pueda definir manualmente un login code en lugar de solo leerlo desde el clipboard?
 'SOLUCION: Al hacer click al boton se pregunta para introducir manualmente el codigo (aunque seria innecesario), mejor preguntar que hotel lanzar directamente? o tambien es innecesario? si todo es innecesario capaz convenga hacer que deje de ser un boton y pase a ser un label
@@ -33,7 +36,47 @@ Partial Public Class MainWindow : Inherits Window
     Public UpdateSource As String = "AIR_Official"
     Public CurrentLanguageInt As Integer = 0
     Private ReadOnly HttpClient As New HttpClient()
+    Private NamedPipeCancellationTokenSource As CancellationTokenSource
+
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
+
+
+    Private Sub StartPipedLoginTicketListener()
+        NamedPipeCancellationTokenSource = New CancellationTokenSource()
+        Task.Run(Async Function()
+                     Try
+                         While Not NamedPipeCancellationTokenSource.Token.IsCancellationRequested
+                             Using pipeServer As New NamedPipeServerStream("HabboCustomLauncherBeta", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous)
+                                 Await pipeServer.WaitForConnectionAsync(NamedPipeCancellationTokenSource.Token)
+                                 Using reader As New StreamReader(pipeServer)
+                                     Dim arguments As String = Await reader.ReadLineAsync()
+                                     If arguments IsNot Nothing Then
+                                         Await Dispatcher.UIThread.InvokeAsync(Sub()
+                                                                                   Window.WindowState = WindowState.Normal
+                                                                                   Window.Activate()
+                                                                                   If arguments = "main" = False Then
+                                                                                       Clipboard.SetTextAsync(arguments).Wait()
+                                                                                       CheckClipboardLoginCodeAsync()
+                                                                                   End If
+                                                                               End Sub)
+                                     End If
+                                 End Using
+                             End Using
+                         End While
+                     Catch ex As OperationCanceledException
+                         Console.WriteLine("Escucha de pipes cancelada.")
+                     Catch ex As Exception
+                         Console.WriteLine("Error en el servidor de pipes: " & ex.Message)
+                     End Try
+                 End Function)
+    End Sub
+
+    Public Sub StopPipedLoginTicketListener()
+        If NamedPipeCancellationTokenSource IsNot Nothing Then
+            NamedPipeCancellationTokenSource.Cancel()
+            NamedPipeCancellationTokenSource.Dispose()
+        End If
+    End Sub
 
     Sub New()
         ' This call is required by the designer
@@ -60,15 +103,26 @@ Partial Public Class MainWindow : Inherits Window
         'CopyrightLabel = Window.FindNameScope.Find("CopyrightLabel")
         'CopyrightLabel.Content = AppTranslator.Copyright(CurrentLanguageInt)
         FooterButton = Window.FindNameScope.Find("FooterButton")
+        StartPipedLoginTicketListener()
         DisplayLauncherVersionOnFooter()
         RefreshUpdateSourceText()
         CheckClipboardLoginCodeAsync()
         FixWindowsTLS()
+        RegisterHabboProtocol()
+
+        For Each Argument In Environment.GetCommandLineArgs()
+            If Argument.StartsWith("habbo://") Then
+                Argument = Argument.Remove(0, Argument.IndexOf("?server=") + 8)
+                Argument = Argument.Replace("&token=", ".")
+                Clipboard.SetTextAsync(Argument).Wait()
+                CheckClipboardLoginCodeAsync()
+            End If
+        Next
     End Sub
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 1 (18/12/2024)"
+        FooterButton.Text = "CustomLauncher version 2 (18/12/2024)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -311,8 +365,7 @@ Partial Public Class MainWindow : Inherits Window
     End Function
 
     Private Sub LoginCodeButton_Click(sender As Object, e As EventArgs) Handles LoginCodeButton.Click
-        Clipboard.SetTextAsync("hhes..")
-        CheckClipboardLoginCodeAsync()
+
     End Sub
 
     Private Sub RefreshUpdateSourceText()
@@ -350,6 +403,33 @@ Partial Public Class MainWindow : Inherits Window
             'Ignore error
         End Try
     End Sub
+
+    Public Function RegisterHabboProtocol() As Boolean
+        Try
+            Dim UriScheme = "habbo"
+            Dim FriendlyName = "Habbo Custom Launcher"
+            Dim applicationLocation As String = Process.GetCurrentProcess().MainModule.FileName
+            If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
+                Using key = Registry.CurrentUser.CreateSubKey("SOFTWARE\Classes\" & UriScheme)
+                    key.SetValue("", "URL:" & FriendlyName)
+                    key.SetValue("URL Protocol", "")
+
+                    Using defaultIcon = key.CreateSubKey("DefaultIcon")
+                        defaultIcon.SetValue("", applicationLocation & ",1")
+                    End Using
+
+                    Using commandKey = key.CreateSubKey("shell\open\command")
+                        commandKey.SetValue("", """" & applicationLocation & """ ""%1""")
+                    End Using
+                End Using
+                Return True
+            End If
+            Throw New Exception("Could not register protocol")
+        Catch
+            'MsgBox(AppTranslator.ProtocolRegError(CurrentLanguageInt), MsgBoxStyle.Critical, "Error")
+            Return False
+        End Try
+    End Function
 
     Public Sub FixWindowsTLS()
         Try
@@ -406,6 +486,12 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Sub GithubButton_PointerPressed(sender As Object, e As Avalonia.Input.PointerPressedEventArgs) Handles GithubButton.PointerPressed
         Process.Start(New ProcessStartInfo("https://github.com/LilithRainbows/HabboCustomLauncherBeta") With {.UseShellExecute = True})
+    End Sub
+
+    Private Sub MainWindow_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
+        If NamedPipeCancellationTokenSource.IsCancellationRequested = False Then
+            StopPipedLoginTicketListener()
+        End If
     End Sub
 End Class
 
