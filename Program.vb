@@ -21,7 +21,7 @@ Module Program
                     Argument = Argument.Remove(0, Argument.IndexOf("?server=") + 8)
                     Argument = Argument.Replace("&token=", ".")
                     SendLoginTicketToMainInstance(Argument)
-                    Exit For
+                    Return
                 End If
             Next
             SendLoginTicketToMainInstance("main")
