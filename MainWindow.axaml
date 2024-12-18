@@ -1,0 +1,52 @@
+<Window x:Class="HabboCustomLauncher.MainWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:HabboCustomLauncher"
+        x:Name="Window"
+        mc:Ignorable="d" Width="640" Height="480" CanResize="False"
+        Title="HabboCustomLauncher"
+        WindowStartupLocation="CenterScreen" Background="Black" FontFamily="{StaticResource NewSegoeUI}" Icon="/Assets/HabboCustomLauncherIcon.ico">
+  <Grid>
+    <Image Source="/Assets/modal-backdrop-pink.png"/>
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+      <Grid Grid.Row="0">
+        <Image Source="/Assets/habbo-logo-big.png" Stretch="None" Margin="20,20,20,0" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+      </Grid>
+      <Grid Grid.Row="1" Margin="100,0,100,0" VerticalAlignment="Center">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+          <!--<Label Background="#7F313131" Grid.Row="0" Content="Clipboard login code not detected" Foreground="White" FontSize="13" HorizontalContentAlignment="Center" Margin="10,0,10,0" VerticalContentAlignment="Center" />-->
+          <local:CustomButton x:Name="LoginCodeButton" Grid.Row="0" Text="Clipboard login code not detected" BackColor="#3F3F3F" Margin="0,0,0,10" Height="40" IsButtonCornered="False"/>
+          <Grid Grid.Row="1" Margin="0,0,0,10" Height="40">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition />
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <local:CustomButton IsButtonDisabled="True" x:Name="StartNewInstanceButton" Grid.Column="0" Text="Unknown client version" BackColor="#990084" />
+            <local:CustomButton IsButtonDisabled="True" x:Name="StartNewInstanceButton2" Grid.Column="1" Text="X" BackColor="#990084" Margin="5,0,0,0"/>
+          </Grid>
+          <local:CustomButton IsButtonDisabled="True" x:Name="ChangeUpdateSourceButton" Grid.Row="2" Text="Current update source: AIR (Official)" BackColor="#990084" Margin="0,0,0,0" Height="40"/>
+        </Grid>
+      </Grid>
+      <Grid Grid.Row="2">
+        <Grid Background="Black" Opacity="0.5"/>
+        <!--<Label Opacity="0" Name="CopyrightLabel" Content="© Sulake Oy all rights reserved." HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White" FontSize="15"/>-->
+        <local:CustomButton IsButtonDisabled="False" x:Name="FooterButton" Text="Unknown CustomLauncher version" BackColor="Transparent" Opacity="0.8" HorizontalAlignment="Center" VerticalAlignment="Center" Height="40"/>
+        <!--<Label Name="CopyrightLab2el" Padding="10" BorderBrush="Black" BorderThickness="1" Background="#50000000" Opacity="0.8" Content="Ingresando como LilithRainbows" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White" FontSize="15"/>-->
+        <Image Name="GithubButton" ToolTip.Tip="Github" Source="/Assets/github-icon.png" Stretch="None" Margin="10,10,0,10" HorizontalAlignment="Left"/>
+        <Image Source="/Assets/habbo-footer.png" Stretch="None" Margin="0,10,20,10" HorizontalAlignment="Right"/>
+      </Grid>
+    </Grid>
+  </Grid>
+</Window>

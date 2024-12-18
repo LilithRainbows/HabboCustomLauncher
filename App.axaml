@@ -1,0 +1,14 @@
+<Application x:Class="HabboCustomLauncher.App"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             RequestedThemeVariant="Light"
+             >      <!-- For Avalonia 11+: RequestedThemeVariant="Light" (And also install nuget fluent theme package) -->
+  <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+
+  <Application.Styles>
+    <FluentTheme />    <!-- For Avalonia 11+: <FluentTheme /> -->
+  </Application.Styles>
+  <Application.Resources>
+    <FontFamily x:Key="NewSegoeUI">/Assets#Segoe UI Variable</FontFamily>
+  </Application.Resources>
+</Application>

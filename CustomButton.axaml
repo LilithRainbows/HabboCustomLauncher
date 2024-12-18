@@ -1,0 +1,54 @@
+<UserControl x:Class="HabboCustomLauncher.CustomButton"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             mc:Ignorable="d"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             Text="Example"
+             BackColor="#BC00A3"
+             Foreground="White"
+             IsButtonCornered="True"
+             IsButtonDisabled="False"
+             Padding="0">
+  <Grid>
+    <Button ZIndex="0" x:Name="InnerButton" FontSize="13" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" IsTabStop="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=!IsButtonDisabled}" Content="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=Text}" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+      <Button.Background>
+        <SolidColorBrush Color="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=BackColor}" Opacity="0.5"/>
+      </Button.Background>
+      <Button.Styles>
+        <Style Selector="Button">
+          <Setter Property="Background">
+            <Setter.Value>
+              <SolidColorBrush Color="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=BackColor}" Opacity="0.5" />
+            </Setter.Value>
+          </Setter>
+          <Setter Property="TextBlock.Foreground" Value="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=Foreground}" />
+        </Style>
+        <Style Selector="Button:pointerover /template/ ContentPresenter">
+          <Setter Property="Background">
+            <Setter.Value>
+              <SolidColorBrush Color="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=BackColor}"  Opacity="0.8" />
+            </Setter.Value>
+          </Setter>
+          <Setter Property="TextBlock.Foreground" Value="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=Foreground}" />
+        </Style>
+        <Style Selector="Button:pressed /template/ ContentPresenter">
+          <Setter Property="Background">
+            <Setter.Value>
+              <SolidColorBrush Color="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=BackColor}" Opacity="1.0" />
+            </Setter.Value>
+          </Setter>
+          <Setter Property="TextBlock.Foreground" Value="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=Foreground}" />
+        </Style>
+      </Button.Styles>
+    </Button>
+    <Grid ZIndex="2" Background="Black" Opacity="0" IsVisible="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=IsButtonDisabled}"/>
+    <Grid ZIndex="1" IsVisible="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}, Path=IsButtonDisabled}">
+      <Border BorderThickness="1" CornerRadius="{Binding ElementName=InnerButton, Path=CornerRadius}">
+        <Border.Background>
+          <SolidColorBrush Color="Black" Opacity="0.5"/>
+        </Border.Background>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>
