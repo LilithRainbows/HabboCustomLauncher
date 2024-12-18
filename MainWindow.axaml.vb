@@ -14,7 +14,6 @@ Imports Avalonia.Media
 Imports Avalonia.Platform
 Imports Avalonia.Threading
 Imports Microsoft.Win32
-Imports SkiaSharp
 
 'PROBLEMA: Como se puede hacer para que se pueda definir manualmente un login code en lugar de solo leerlo desde el clipboard?
 'SOLUCION: Al hacer click al boton se pregunta para introducir manualmente el codigo (aunque seria innecesario), mejor preguntar que hotel lanzar directamente? o tambien es innecesario? si todo es innecesario capaz convenga hacer que deje de ser un boton y pase a ser un label
@@ -122,7 +121,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 2 (18/12/2024)"
+        FooterButton.Text = "CustomLauncher version 3 (18/12/2024)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -297,6 +296,8 @@ Partial Public Class MainWindow : Inherits Window
                 CurrentLoginCode = ClipboardLoginCode
                 LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeDetected(CurrentLanguageInt) & " [" & ClipboardLoginCode.ServerId.Replace("hh", "").ToUpper & "]"
                 If OldLoginTicket = ClipboardLoginCode.SSOTicket = False Then
+                    Window.WindowState = WindowState.Normal
+                    Window.Activate()
                     DisplayCurrentUserOnFooter()
                     Await UpdateClientButtonStatus()
                 End If

@@ -4,10 +4,7 @@ Imports System.Reflection
 Imports System.Runtime.InteropServices
 Imports System.Threading
 Imports Avalonia
-Imports Avalonia.Controls
-Imports Avalonia.Input.Platform
 Imports Avalonia.Media
-Imports Avalonia.Platform
 
 
 Module Program
@@ -15,10 +12,7 @@ Module Program
 
     <STAThread>
     Sub Main(args As String())
-        ' Define un nombre único para el mutex (puede ser un GUID o un identificador único)
-        Dim mutexName As String = "Global\MiAppInstanciaUnica"
-
-        ' Intenta crear o abrir el mutex
+        Dim mutexName As String = "HabboCustomLauncherBeta"
         Dim isNewInstance As Boolean
         appMutex = New Mutex(True, mutexName, isNewInstance)
         If Not isNewInstance Then
@@ -28,11 +22,9 @@ Module Program
                     Argument = Argument.Replace("&token=", ".")
                     SendLoginTicketToMainInstance(Argument)
                     Exit For
-                Else
-                    SendLoginTicketToMainInstance("main")
-                    Exit For
                 End If
             Next
+            SendLoginTicketToMainInstance("main")
             Return
         End If
 
