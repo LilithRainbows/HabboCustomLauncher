@@ -36,6 +36,7 @@ Partial Public Class MainWindow : Inherits Window
     Public CurrentLanguageInt As Integer = 0
     Private ReadOnly HttpClient As New HttpClient()
     Private NamedPipeCancellationTokenSource As CancellationTokenSource
+    Public LinuxPatchName As String = "HabboAirLinuxPatch_x64.zip"
 
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
 
@@ -108,6 +109,10 @@ Partial Public Class MainWindow : Inherits Window
         CheckClipboardLoginCodeAsync()
         FixWindowsTLS()
         RegisterHabboProtocol()
+
+        If RuntimeInformation.IsOSPlatform(OSPlatform.Linux) AndAlso RuntimeInformation.ProcessArchitecture = Architecture.Arm64 Then
+            LinuxPatchName = "HabboAirLinuxPatch_arm64.zip"
+        End If
 
         For Each Argument In Environment.GetCommandLineArgs()
             If Argument.StartsWith("habbo://") Then
@@ -220,8 +225,8 @@ Partial Public Class MainWindow : Inherits Window
                 End Using
                 Await Task.Run(Sub() File.Delete(ClientFilePath))
                 CopyLinuxPatch(ClientFolderPath)
-                Await Task.Run(Sub() ZipFile.ExtractToDirectory(Path.Combine(ClientFolderPath, "HabboAirLinuxPatch_x64.zip"), ClientFolderPath))
-                File.Delete(Path.Combine(ClientFolderPath, "HabboAirLinuxPatch_x64.zip"))
+                Await Task.Run(Sub() ZipFile.ExtractToDirectory(Path.Combine(ClientFolderPath, LinuxPatchName), ClientFolderPath))
+                File.Delete(Path.Combine(ClientFolderPath, LinuxPatchName))
                 UpdateApplicationXML()
                 MakeExecutable(Path.Combine(ClientFolderPath, "Habbo"))
             End If
@@ -254,9 +259,9 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Public Async Sub CopyLinuxPatch(DestinationFolder As String)
-        Dim resourceName As String = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/HabboAirLinuxPatch_x64.zip"
+        Dim resourceName As String = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/" & LinuxPatchName
         Dim resourceStream As Stream = AssetLoader.Open(New Uri(resourceName))
-        Using fileStream As FileStream = File.Create(Path.Combine(DestinationFolder, "HabboAirLinuxPatch_x64.zip"))
+        Using fileStream As FileStream = File.Create(Path.Combine(DestinationFolder, LinuxPatchName))
             resourceStream.CopyTo(fileStream)
         End Using
     End Sub

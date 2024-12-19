@@ -27,6 +27,10 @@
     <AvaloniaResource Include="Assets\HabboAirLinuxPatch_x64.zip" />
   </ItemGroup>
 
+    <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">
+    <AvaloniaResource Include="Assets\HabboAirLinuxPatch_arm64.zip" />
+  </ItemGroup>
+
   <ItemGroup>
     <AvaloniaResource Include="Assets\HabboCustomLauncherIcon.ico" />
   </ItemGroup>
