@@ -52,6 +52,7 @@ Partial Public Class MainWindow : Inherits Window
                                      Dim arguments As String = Await reader.ReadLineAsync()
                                      If arguments IsNot Nothing Then
                                          Await Dispatcher.UIThread.InvokeAsync(Sub()
+                                                                                   Window.WindowState = WindowState.Minimized
                                                                                    Window.WindowState = WindowState.Normal
                                                                                    Window.Activate()
                                                                                    If arguments = "main" = False Then
@@ -126,7 +127,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 3 (18/12/2024)"
+        FooterButton.Text = "CustomLauncher version 4 (20/12/2024)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
