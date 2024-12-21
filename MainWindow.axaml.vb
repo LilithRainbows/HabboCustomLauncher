@@ -127,7 +127,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 5 (21/12/2024)"
+        FooterButton.Text = "CustomLauncher version 6 (21/12/2024)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -372,7 +372,35 @@ Partial Public Class MainWindow : Inherits Window
     End Function
 
     Private Sub LoginCodeButton_Click(sender As Object, e As EventArgs) Handles LoginCodeButton.Click
-
+        If LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeNotDetected(CurrentLanguageInt) = False Then
+            Return
+        End If
+        Dim HabboAvatarSettingsUrl As String = "https://www.habbo.com/settings/avatars"
+        If Globalization.CultureInfo.CurrentCulture.Name.ToLower.StartsWith("pt") Then
+            HabboAvatarSettingsUrl = "https://www.habbo.com.br/settings/avatars"
+        End If
+        If Globalization.CultureInfo.CurrentCulture.Name.ToLower.StartsWith("es") Then
+            HabboAvatarSettingsUrl = "https://www.habbo.es/settings/avatars"
+        End If
+        If Globalization.CultureInfo.CurrentCulture.Name.ToLower.StartsWith("de") Then
+            HabboAvatarSettingsUrl = "https://www.habbo.de/settings/avatars"
+        End If
+        If Globalization.CultureInfo.CurrentCulture.Name.ToLower.StartsWith("fr") Then
+            HabboAvatarSettingsUrl = "https://www.habbo.fr/settings/avatars"
+        End If
+        If Globalization.CultureInfo.CurrentCulture.Name.ToLower.StartsWith("it") Then
+            HabboAvatarSettingsUrl = "https://www.habbo.it/settings/avatars"
+        End If
+        If Globalization.CultureInfo.CurrentCulture.Name.ToLower = "tr" Then
+            HabboAvatarSettingsUrl = "https://www.habbo.com.tr/settings/avatars"
+        End If
+        If Globalization.CultureInfo.CurrentCulture.Name.ToLower.StartsWith("nl") Then
+            HabboAvatarSettingsUrl = "https://www.habbo.nl/settings/avatars"
+        End If
+        If Globalization.CultureInfo.CurrentCulture.Name.ToLower = "fi" Then
+            HabboAvatarSettingsUrl = "https://www.habbo.fi/settings/avatars"
+        End If
+        Process.Start(New ProcessStartInfo(HabboAvatarSettingsUrl) With {.UseShellExecute = True})
     End Sub
 
     Private Sub RefreshUpdateSourceText()
