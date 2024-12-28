@@ -27,8 +27,16 @@
     <AvaloniaResource Include="Assets\HabboAirLinuxPatch_x64.zip" />
   </ItemGroup>
 
-    <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">
     <AvaloniaResource Include="Assets\HabboAirLinuxPatch_arm64.zip" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64'">
+    <AvaloniaResource Include="Assets\HabboAirOSXPatch.zip" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-arm64'">
+    <AvaloniaResource Include="Assets\HabboAirOSXPatch.zip" />
   </ItemGroup>
 
   <ItemGroup>
@@ -43,7 +51,7 @@
     <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
     <PackageReference Include="Avalonia" Version="11.2.2" />
     <PackageReference Include="Avalonia.Desktop" Version="11.2.2" />
-    <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="0.10.18" />
+    <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.2.2" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.2" />
     <PackageReference Include="XamlNameReferenceGenerator" Version="1.6.1" />
   </ItemGroup>

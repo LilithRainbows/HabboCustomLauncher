@@ -18,7 +18,6 @@ Imports Microsoft.Win32
 'PROBLEMA: Como se puede hacer para que se pueda definir manualmente un login code en lugar de solo leerlo desde el clipboard?
 'SOLUCION: Al hacer click al boton se pregunta para introducir manualmente el codigo (aunque seria innecesario), mejor preguntar que hotel lanzar directamente? o tambien es innecesario? si todo es innecesario capaz convenga hacer que deje de ser un boton y pase a ser un label
 'Quizas habria que revisar en https://images.habbo.com/habbo-native-clients/launcher/clientversions.json para purgar versiones ya invalidas
-'Ver que hacer con el tema de avalonia, si se lo actualiza a la ultima version capaz anda mejor/mas rapido pero no andaria bien en windows 7 (si es que siquiera abre) (recordar problema de fonts en windows 7 con versiones nuevas de avalonia y su posible solucion usando text to image)
 
 Partial Public Class MainWindow : Inherits Window
     Private WithEvents Window As Window
@@ -27,6 +26,7 @@ Partial Public Class MainWindow : Inherits Window
     Private WithEvents LoginCodeButton As CustomButton
     Private WithEvents ChangeUpdateSourceButton As CustomButton
     Private WithEvents GithubButton As Image
+    Private WithEvents SulakeButton As Image
     'Private WithEvents CopyrightLabel As Label
     Private WithEvents FooterButton As CustomButton
     Public CurrentLoginCode As LoginCode
@@ -36,7 +36,7 @@ Partial Public Class MainWindow : Inherits Window
     Public CurrentLanguageInt As Integer = 0
     Private ReadOnly HttpClient As New HttpClient()
     Private NamedPipeCancellationTokenSource As CancellationTokenSource
-    Public LinuxPatchName As String = "HabboAirLinuxPatch_x64.zip"
+    Public UnixPatchName As String = "HabboAirLinuxPatch_x64.zip"
 
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
 
@@ -65,9 +65,9 @@ Partial Public Class MainWindow : Inherits Window
                              End Using
                          End While
                      Catch ex As OperationCanceledException
-                         Console.WriteLine("Escucha de pipes cancelada.")
+                         'Console.WriteLine("Escucha de pipes cancelada.")
                      Catch ex As Exception
-                         Console.WriteLine("Error en el servidor de pipes: " & ex.Message)
+                         'Console.WriteLine("Error en el servidor de pipes: " & ex.Message)
                      End Try
                  End Function)
     End Sub
@@ -101,6 +101,7 @@ Partial Public Class MainWindow : Inherits Window
         ChangeUpdateSourceButton = Window.FindNameScope.Find("ChangeUpdateSourceButton")
         ChangeUpdateSourceButton = Window.FindNameScope.Find("ChangeUpdateSourceButton")
         GithubButton = Window.FindNameScope.Find("GithubButton")
+        SulakeButton = Window.FindNameScope.Find("SulakeButton")
         'CopyrightLabel = Window.FindNameScope.Find("CopyrightLabel")
         'CopyrightLabel.Content = AppTranslator.Copyright(CurrentLanguageInt)
         FooterButton = Window.FindNameScope.Find("FooterButton")
@@ -112,7 +113,10 @@ Partial Public Class MainWindow : Inherits Window
         RegisterHabboProtocol()
 
         If RuntimeInformation.IsOSPlatform(OSPlatform.Linux) AndAlso RuntimeInformation.ProcessArchitecture = Architecture.Arm64 Then
-            LinuxPatchName = "HabboAirLinuxPatch_arm64.zip"
+            UnixPatchName = "HabboAirLinuxPatch_arm64.zip"
+        End If
+        If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+            UnixPatchName = "HabboAirOSXPatch.zip"
         End If
 
         For Each Argument In Environment.GetCommandLineArgs()
@@ -127,7 +131,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 6 (21/12/2024)"
+        FooterButton.Text = "CustomLauncher version 7 (28/12/2024)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -163,9 +167,12 @@ Partial Public Class MainWindow : Inherits Window
     Public Async Function LaunchClient() As Task
         Try
             Dim ClientProcess As New Process
-            If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
+            If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then 'Windows
                 ClientProcess.StartInfo.FileName = Path.Combine(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), "Habbo.exe")
-            Else
+            End If
+            If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then 'OSX
+                ClientProcess.StartInfo.FileName = Path.Combine(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), "Habbo.app/Contents/MacOS/Habbo")
+            Else 'Linux
                 ClientProcess.StartInfo.FileName = Path.Combine(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), "Habbo")
             End If
             ClientProcess.StartInfo.Arguments = "-server " & CurrentLoginCode.ServerId & " -ticket " & CurrentLoginCode.SSOTicket
@@ -178,7 +185,7 @@ Partial Public Class MainWindow : Inherits Window
         End Try
     End Function
 
-    Function MakeExecutable(ByVal filePath As String) As Boolean
+    Function MakeUnixExecutable(ByVal filePath As String) As Boolean
         Try
             ' Permisos: -rwxr--r--
             Dim executablePermissions As UnixFileMode = UnixFileMode.UserRead Or UnixFileMode.UserWrite Or UnixFileMode.UserExecute Or
@@ -187,7 +194,7 @@ Partial Public Class MainWindow : Inherits Window
             File.SetUnixFileMode(filePath, executablePermissions)
             Return True ' Éxito
         Catch ex As Exception
-            Console.WriteLine($"Error: {ex.Message}")
+            Console.WriteLine($"Error while making executable: {ex.Message}")
             Return False ' Fallo
         End Try
     End Function
@@ -226,10 +233,15 @@ Partial Public Class MainWindow : Inherits Window
                 End Using
                 Await Task.Run(Sub() File.Delete(ClientFilePath))
                 CopyLinuxPatch(ClientFolderPath)
-                Await Task.Run(Sub() ZipFile.ExtractToDirectory(Path.Combine(ClientFolderPath, LinuxPatchName), ClientFolderPath))
-                File.Delete(Path.Combine(ClientFolderPath, LinuxPatchName))
-                UpdateApplicationXML()
-                MakeExecutable(Path.Combine(ClientFolderPath, "Habbo"))
+                Await Task.Run(Sub() ZipFile.ExtractToDirectory(Path.Combine(ClientFolderPath, UnixPatchName), ClientFolderPath))
+                File.Delete(Path.Combine(ClientFolderPath, UnixPatchName))
+                UpdateUnixApplicationXML()
+                If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then 'OSX
+                    FixOSXClientStructure()
+                    MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo.app/Contents/MacOS/Habbo"))
+                Else
+                    MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo")) 'Linux
+                End If
             End If
 
             StartNewInstanceButton.IsButtonDisabled = False
@@ -245,7 +257,37 @@ Partial Public Class MainWindow : Inherits Window
         End Try
     End Function
 
-    Public Async Sub UpdateApplicationXML()
+    Public Async Sub FixOSXClientStructure()
+        ' Rutas de origen y destino
+        Dim origen As String = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
+        Dim destino As String = Path.Combine(origen, "Habbo.app/Contents/Resources")
+
+        ' Exclusiones
+        Dim carpetaExcluida As String = "Habbo.app"
+        Dim archivoExcluido As String = "README.txt"
+
+        ' Mover archivos
+        For Each archivo In Directory.GetFiles(origen)
+            Dim nombreArchivo As String = Path.GetFileName(archivo)
+            If Not nombreArchivo.Equals(archivoExcluido, StringComparison.OrdinalIgnoreCase) Then
+                Dim destinoArchivo As String = Path.Combine(destino, nombreArchivo)
+                'Console.WriteLine(nombreArchivo & " > " & destino)
+                File.Move(archivo, destinoArchivo)
+            End If
+        Next
+
+        ' Mover carpetas
+        For Each carpeta In Directory.GetDirectories(origen)
+            Dim nombreCarpeta As String = Path.GetFileName(carpeta)
+            If Not nombreCarpeta.Equals(carpetaExcluida, StringComparison.OrdinalIgnoreCase) Then
+                Dim destinoCarpeta As String = Path.Combine(destino, nombreCarpeta)
+                'Console.WriteLine(carpeta & " > " & destinoCarpeta)
+                Directory.Move(carpeta, destinoCarpeta)
+            End If
+        Next
+    End Sub
+
+    Public Async Sub UpdateUnixApplicationXML()
         Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
         Dim OriginalXmlPath As String = Path.Combine(ClientFolderPath, "META-INF/AIR/application.xml")
         Dim OriginalXmlVersionNumber As String
@@ -260,9 +302,9 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Public Async Sub CopyLinuxPatch(DestinationFolder As String)
-        Dim resourceName As String = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/" & LinuxPatchName
+        Dim resourceName As String = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/" & UnixPatchName
         Dim resourceStream As Stream = AssetLoader.Open(New Uri(resourceName))
-        Using fileStream As FileStream = File.Create(Path.Combine(DestinationFolder, LinuxPatchName))
+        Using fileStream As FileStream = File.Create(Path.Combine(DestinationFolder, UnixPatchName))
             resourceStream.CopyTo(fileStream)
         End Using
     End Sub
@@ -521,6 +563,10 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Sub GithubButton_PointerPressed(sender As Object, e As Avalonia.Input.PointerPressedEventArgs) Handles GithubButton.PointerPressed
         Process.Start(New ProcessStartInfo("https://github.com/LilithRainbows/HabboCustomLauncherBeta") With {.UseShellExecute = True})
+    End Sub
+
+    Private Sub SulakeButton_PointerPressed(sender As Object, e As Avalonia.Input.PointerPressedEventArgs) Handles SulakeButton.PointerPressed
+        Process.Start(New ProcessStartInfo("https://www.sulake.com/habbo/") With {.UseShellExecute = True})
     End Sub
 
     Private Sub MainWindow_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
