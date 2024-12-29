@@ -131,7 +131,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 7 (28/12/2024)"
+        FooterButton.Text = "CustomLauncher version 8 (28/12/2024)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -557,8 +557,10 @@ Partial Public Class MainWindow : Inherits Window
     End Function
 
     Private Sub FooterButton_Click(sender As Object, e As EventArgs) Handles FooterButton.Click
-        Dim ProfileUrl = "https://" & CurrentLoginCode.ServerUrl & "/profile/" & CurrentLoginCode.Username
-        Process.Start(New ProcessStartInfo(ProfileUrl) With {.UseShellExecute = True})
+        If FooterButton.Text.StartsWith(AppTranslator.PlayingAs(CurrentLanguageInt)) Then
+            Dim ProfileUrl = "https://" & CurrentLoginCode.ServerUrl & "/profile/" & CurrentLoginCode.Username
+            Process.Start(New ProcessStartInfo(ProfileUrl) With {.UseShellExecute = True})
+        End If
     End Sub
 
     Private Sub GithubButton_PointerPressed(sender As Object, e As Avalonia.Input.PointerPressedEventArgs) Handles GithubButton.PointerPressed
