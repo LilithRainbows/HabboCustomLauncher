@@ -41,42 +41,43 @@ Partial Public Class MainWindow : Inherits Window
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
 
 
-    Private Sub StartPipedLoginTicketListener()
-        NamedPipeCancellationTokenSource = New CancellationTokenSource()
-        Task.Run(Async Function()
-                     Try
-                         While Not NamedPipeCancellationTokenSource.Token.IsCancellationRequested
-                             Using pipeServer As New NamedPipeServerStream("HabboCustomLauncherBeta", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous)
-                                 Await pipeServer.WaitForConnectionAsync(NamedPipeCancellationTokenSource.Token)
-                                 Using reader As New StreamReader(pipeServer)
-                                     Dim arguments As String = Await reader.ReadLineAsync()
-                                     If arguments IsNot Nothing Then
-                                         Await Dispatcher.UIThread.InvokeAsync(Sub()
-                                                                                   Window.WindowState = WindowState.Minimized
-                                                                                   Window.WindowState = WindowState.Normal
-                                                                                   Window.Activate()
-                                                                                   If arguments = "main" = False Then
-                                                                                       Clipboard.SetTextAsync(arguments).Wait()
-                                                                                       CheckClipboardLoginCodeAsync()
-                                                                                   End If
-                                                                               End Sub)
-                                     End If
-                                 End Using
-                             End Using
-                         End While
-                     Catch ex As OperationCanceledException
-                         'Console.WriteLine("Escucha de pipes cancelada.")
-                     Catch ex As Exception
-                         'Console.WriteLine("Error en el servidor de pipes: " & ex.Message)
-                     End Try
-                 End Function)
+    Public Async Sub StartPipedLoginTicketListener()
+        Try
+            If NamedPipeCancellationTokenSource Is Nothing Then
+                NamedPipeCancellationTokenSource = New CancellationTokenSource()
+                While Not NamedPipeCancellationTokenSource.Token.IsCancellationRequested
+                    Using pipeServer As New NamedPipeServerStream("HabboCustomLauncherBeta", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous)
+                        Await pipeServer.WaitForConnectionAsync(NamedPipeCancellationTokenSource.Token)
+                        Using reader As New StreamReader(pipeServer)
+                            Dim arguments As String = Await reader.ReadLineAsync()
+                            If arguments IsNot Nothing Then
+                                Window.WindowState = WindowState.Minimized
+                                Window.WindowState = WindowState.Normal
+                                Window.Activate()
+                                If arguments = "main" = False Then
+                                    Await Clipboard.SetTextAsync(arguments)
+                                    Await CheckClipboardLoginCodeAsync()
+                                End If
+                            End If
+                        End Using
+                    End Using
+                End While
+            End If
+        Catch
+            'Console.WriteLine("PipeServer error!")
+        End Try
+        StopPipedLoginTicketListener()
     End Sub
 
     Public Sub StopPipedLoginTicketListener()
-        If NamedPipeCancellationTokenSource IsNot Nothing Then
-            NamedPipeCancellationTokenSource.Cancel()
-            NamedPipeCancellationTokenSource.Dispose()
-        End If
+        Try
+            If NamedPipeCancellationTokenSource IsNot Nothing Then
+                NamedPipeCancellationTokenSource.Cancel()
+                NamedPipeCancellationTokenSource.Dispose()
+                NamedPipeCancellationTokenSource = Nothing
+            End If
+        Catch
+        End Try
     End Sub
 
     Sub New()
@@ -108,7 +109,7 @@ Partial Public Class MainWindow : Inherits Window
         StartPipedLoginTicketListener()
         DisplayLauncherVersionOnFooter()
         RefreshUpdateSourceText()
-        CheckClipboardLoginCodeAsync()
+        StartRecursiveClipboardLoginCodeCheckAsync()
         FixWindowsTLS()
         RegisterHabboProtocol()
 
@@ -131,7 +132,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 8 (28/12/2024)"
+        FooterButton.Text = "CustomLauncher version 9 (07/01/2025)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -330,7 +331,14 @@ Partial Public Class MainWindow : Inherits Window
         End Using
     End Function
 
-    Private Async Sub CheckClipboardLoginCodeAsync()
+    Private Async Sub StartRecursiveClipboardLoginCodeCheckAsync()
+        Do While True
+            Await Task.Delay(500)
+            Await CheckClipboardLoginCodeAsync()
+        Loop
+    End Sub
+
+    Private Async Function CheckClipboardLoginCodeAsync() As Task(Of Boolean)
         Try
             Dim ClipboardText = Await Clipboard.GetTextAsync()
             Dim ClipboardLoginCode As New LoginCode(ClipboardText)
@@ -348,6 +356,7 @@ Partial Public Class MainWindow : Inherits Window
                     Window.Activate()
                     DisplayCurrentUserOnFooter()
                     Await UpdateClientButtonStatus()
+                    Return True
                 End If
                 'Await Application.Current.Clipboard.SetTextAsync("ServerId: " & LoginCode.ServerId & " - ServerUrl: " & LoginCode.ServerUrl & " - SSOTicket: " & LoginCode.SSOTicket)
             End If
@@ -359,9 +368,8 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton.Text = AppTranslator.UnknownClientVersion(CurrentLanguageInt)
             DisplayLauncherVersionOnFooter()
         End Try
-        Await Task.Delay(500)
-        CheckClipboardLoginCodeAsync()
-    End Sub
+        Return False
+    End Function
 
     Public Async Function CleanDeprecatedClients() As Task
         'AGREGAR OPCION PARA HABILITAR/DESHABILITAR LA LIMPIEZA AUTOMATICA DE CLIENTES OBSOLETOS?
