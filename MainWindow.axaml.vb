@@ -132,7 +132,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 9 (07/01/2025)"
+        FooterButton.Text = "CustomLauncher version 10 (16/01/2025)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -352,6 +352,7 @@ Partial Public Class MainWindow : Inherits Window
                 CurrentLoginCode = ClipboardLoginCode
                 LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeDetected(CurrentLanguageInt) & " [" & ClipboardLoginCode.ServerId.Replace("hh", "").ToUpper & "]"
                 If OldLoginTicket = ClipboardLoginCode.SSOTicket = False Then
+                    Window.WindowState = WindowState.Minimized
                     Window.WindowState = WindowState.Normal
                     Window.Activate()
                     DisplayCurrentUserOnFooter()
