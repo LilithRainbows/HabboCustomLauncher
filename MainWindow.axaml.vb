@@ -12,7 +12,6 @@ Imports Avalonia.Interactivity
 Imports Avalonia.Markup.Xaml
 Imports Avalonia.Media
 Imports Avalonia.Platform
-Imports Avalonia.Threading
 Imports Microsoft.Win32
 
 'PROBLEMA: Como se puede hacer para que se pueda definir manualmente un login code en lugar de solo leerlo desde el clipboard?
@@ -132,7 +131,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 10 (16/01/2025)"
+        FooterButton.Text = "CustomLauncher version 11 (26/01/2025)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
