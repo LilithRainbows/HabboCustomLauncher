@@ -26,7 +26,6 @@ Partial Public Class MainWindow : Inherits Window
     Private WithEvents ChangeUpdateSourceButton As CustomButton
     Private WithEvents GithubButton As Image
     Private WithEvents SulakeButton As Image
-    'Private WithEvents CopyrightLabel As Label
     Private WithEvents FooterButton As CustomButton
     Public CurrentLoginCode As LoginCode
     Public CurrentClientUrls As JsonClientUrls
@@ -102,9 +101,11 @@ Partial Public Class MainWindow : Inherits Window
         ChangeUpdateSourceButton = Window.FindNameScope.Find("ChangeUpdateSourceButton")
         GithubButton = Window.FindNameScope.Find("GithubButton")
         SulakeButton = Window.FindNameScope.Find("SulakeButton")
-        'CopyrightLabel = Window.FindNameScope.Find("CopyrightLabel")
-        'CopyrightLabel.Content = AppTranslator.Copyright(CurrentLanguageInt)
         FooterButton = Window.FindNameScope.Find("FooterButton")
+
+        LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeNotDetected(CurrentLanguageInt)
+        StartNewInstanceButton.Text = AppTranslator.UnknownClientVersion(CurrentLanguageInt)
+
         StartPipedLoginTicketListener()
         DisplayLauncherVersionOnFooter()
         RefreshUpdateSourceText()
@@ -476,7 +477,7 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Private Sub StartNewInstanceButton2_Click(sender As Object, e As EventArgs) Handles StartNewInstanceButton2.Click
-        'Temporalmente elimina la instalacion actual, en un futuro deberia abrirse uan ventana con varias opciones
+        'Temporalmente elimina la instalacion actual, en un futuro deberia abrirse una ventana con varias opciones
         '(Por ejemplo usar una version especifica ya descargada del cliente, borrar instalacion existente, borrar todas instalaciones, etc.)
         Try
             Directory.Delete(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), True)
