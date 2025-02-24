@@ -131,7 +131,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 11 (26/01/2025)"
+        FooterButton.Text = "CustomLauncher version 12 (24/02/2025)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
