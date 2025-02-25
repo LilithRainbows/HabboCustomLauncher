@@ -451,7 +451,11 @@ Partial Public Class MainWindow : Inherits Window
         If Globalization.CultureInfo.CurrentCulture.Name.ToLower = "fi" Then
             HabboAvatarSettingsUrl = "https://www.habbo.fi/settings/avatars"
         End If
-        Process.Start(New ProcessStartInfo(HabboAvatarSettingsUrl) With {.UseShellExecute = True})
+        Try
+            Process.Start(New ProcessStartInfo(HabboAvatarSettingsUrl) With {.UseShellExecute = True})
+        Catch
+            'Error while launching habbo avatar settings url
+        End Try
     End Sub
 
     Private Sub RefreshUpdateSourceText()
@@ -568,16 +572,28 @@ Partial Public Class MainWindow : Inherits Window
     Private Sub FooterButton_Click(sender As Object, e As EventArgs) Handles FooterButton.Click
         If FooterButton.Text.StartsWith(AppTranslator.PlayingAs(CurrentLanguageInt)) Then
             Dim ProfileUrl = "https://" & CurrentLoginCode.ServerUrl & "/profile/" & CurrentLoginCode.Username
-            Process.Start(New ProcessStartInfo(ProfileUrl) With {.UseShellExecute = True})
+            Try
+                Process.Start(New ProcessStartInfo(ProfileUrl) With {.UseShellExecute = True})
+            Catch
+                'Error while launching habbo profile url
+            End Try
         End If
     End Sub
 
     Private Sub GithubButton_PointerPressed(sender As Object, e As Avalonia.Input.PointerPressedEventArgs) Handles GithubButton.PointerPressed
-        Process.Start(New ProcessStartInfo("https://github.com/LilithRainbows/HabboCustomLauncherBeta") With {.UseShellExecute = True})
+        Try
+            Process.Start(New ProcessStartInfo("https://github.com/LilithRainbows/HabboCustomLauncherBeta") With {.UseShellExecute = True})
+        Catch
+            'Error while launching github url
+        End Try
     End Sub
 
     Private Sub SulakeButton_PointerPressed(sender As Object, e As Avalonia.Input.PointerPressedEventArgs) Handles SulakeButton.PointerPressed
-        Process.Start(New ProcessStartInfo("https://www.sulake.com/habbo/") With {.UseShellExecute = True})
+        Try
+            Process.Start(New ProcessStartInfo("https://www.sulake.com/habbo/") With {.UseShellExecute = True})
+        Catch
+            'Error while launching sulake url
+        End Try
     End Sub
 
     Private Sub MainWindow_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
