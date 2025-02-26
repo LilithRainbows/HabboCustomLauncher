@@ -11,14 +11,22 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\github-icon-2.png" />
     <None Remove="Assets\github-icon.png" />
+    <None Remove="Assets\habbo-footer-2.png" />
+    <None Remove="Assets\habbo-logo-big-2.png" />
+    <None Remove="Assets\HabboCustomLauncherIcon.png" />
     <None Remove="Assets\Segoe-UI-Variable-Static-Text.ttf" />
   </ItemGroup>
 
   <ItemGroup>
+    <AvaloniaResource Include="Assets\github-icon-2.png" />
     <AvaloniaResource Include="Assets\github-icon.png" />
+    <AvaloniaResource Include="Assets\habbo-footer-2.png" />
     <AvaloniaResource Include="Assets\habbo-footer.png" />
+    <AvaloniaResource Include="Assets\habbo-logo-big-2.png" />
     <AvaloniaResource Include="Assets\habbo-logo-big.png" />
+    <AvaloniaResource Include="Assets\HabboCustomLauncherIcon.png" />
     <AvaloniaResource Include="Assets\modal-backdrop-pink.png" />
     <AvaloniaResource Include="Assets\Segoe-UI-Variable-Static-Text.ttf" />
   </ItemGroup>
@@ -51,6 +59,7 @@
     <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
     <PackageReference Include="Avalonia.Desktop" Version="11.2.3" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.3" />
+    <PackageReference Include="WindowsShortcutFactory" Version="1.2.0" />
   </ItemGroup>
 
 </Project>

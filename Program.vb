@@ -12,33 +12,42 @@ Module Program
 
     <STAThread>
     Sub Main(args As String())
-        Dim mutexName As String = "HabboCustomLauncherBeta"
-        Dim isNewInstance As Boolean
-        appMutex = New Mutex(True, mutexName, isNewInstance)
-        If Not isNewInstance Then
-            For Each Argument In Environment.GetCommandLineArgs()
-                If Argument.StartsWith("habbo://") Then
-                    Argument = Argument.Remove(0, Argument.IndexOf("?server=") + 8)
-                    Argument = Argument.Replace("&token=", ".")
-                    SendLoginTicketToMainInstance(Argument)
-                    Return
-                End If
-            Next
-            SendLoginTicketToMainInstance("main")
-            Return
-        End If
+        Try
+            Dim mutexName As String = "HabboCustomLauncherBeta"
+            Dim isNewInstance As Boolean
+            appMutex = New Mutex(True, mutexName, isNewInstance)
+            If Not isNewInstance Then
+                For Each Argument In Environment.GetCommandLineArgs()
+                    If Argument.StartsWith("habbo://") Then
+                        Argument = Argument.Remove(0, Argument.IndexOf("?server=") + 8)
+                        Argument = Argument.Replace("&token=", ".")
+                        SendLoginTicketToMainInstance(Argument)
+                        Return
+                    End If
+                Next
+                SendLoginTicketToMainInstance("main")
+                Return
+            End If
 
-        Dim AvaloniaApp = BuildAvaloniaApp()
-        Dim osVersion = Environment.OSVersion.Version
-        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) AndAlso osVersion.Major = 6 AndAlso osVersion.Minor = 1 Then 'Usando Windows 7 se define renderizado por software debido a que el usuario probablemente tenga una gpu demasiado antigua para soportar opengl de forma adecuada (gma3600 por ejemplo da problemas)
-            Dim Win32Options As New Win32PlatformOptions With {
-                .RenderingMode = {Win32RenderingMode.Software},
-                .CompositionMode = {Win32CompositionMode.RedirectionSurface}
-                }
-            AvaloniaApp.With(Win32Options)
-        End If
-        AvaloniaApp.StartWithClassicDesktopLifetime(args)
-        appMutex.ReleaseMutex()
+            Dim AvaloniaApp = BuildAvaloniaApp()
+            Dim osVersion = Environment.OSVersion.Version
+            If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) AndAlso osVersion.Major = 6 AndAlso osVersion.Minor = 1 Then 'Usando Windows 7 se define renderizado por software debido a que el usuario probablemente tenga una gpu demasiado antigua para soportar opengl de forma adecuada (gma3600 por ejemplo da problemas)
+                Dim Win32Options As New Win32PlatformOptions With {
+                    .RenderingMode = {Win32RenderingMode.Software},
+                    .CompositionMode = {Win32CompositionMode.RedirectionSurface}
+                    }
+                AvaloniaApp.With(Win32Options)
+            End If
+            AvaloniaApp.StartWithClassicDesktopLifetime(args)
+        Catch
+            'App startup error
+        End Try
+        Try
+            appMutex.ReleaseMutex()
+        Catch
+            'Error while releasing mutex
+        End Try
+        Environment.Exit(0)
     End Sub
 
     Private Sub SendLoginTicketToMainInstance(LoginTicket As String)
@@ -51,7 +60,7 @@ Module Program
                 End Using
             End Using
         Catch ex As Exception
-            Console.WriteLine("Error al enviar los argumentos: " & ex.Message)
+            Console.WriteLine("Error while sending login ticket to main instance: " & ex.Message)
         End Try
     End Sub
 

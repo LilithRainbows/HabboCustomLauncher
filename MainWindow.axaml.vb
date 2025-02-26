@@ -11,8 +11,10 @@ Imports Avalonia.Controls
 Imports Avalonia.Interactivity
 Imports Avalonia.Markup.Xaml
 Imports Avalonia.Media
+Imports Avalonia.Media.Imaging
 Imports Avalonia.Platform
 Imports Microsoft.Win32
+Imports WindowsShortcutFactory
 
 'PROBLEMA: Como se puede hacer para que se pueda definir manualmente un login code en lugar de solo leerlo desde el clipboard?
 'SOLUCION: Al hacer click al boton se pregunta para introducir manualmente el codigo (aunque seria innecesario), mejor preguntar que hotel lanzar directamente? o tambien es innecesario? si todo es innecesario capaz convenga hacer que deje de ser un boton y pase a ser un label
@@ -24,6 +26,7 @@ Partial Public Class MainWindow : Inherits Window
     Private WithEvents StartNewInstanceButton2 As CustomButton
     Private WithEvents LoginCodeButton As CustomButton
     Private WithEvents ChangeUpdateSourceButton As CustomButton
+    Private WithEvents HabboLogoButton As Image
     Private WithEvents GithubButton As Image
     Private WithEvents SulakeButton As Image
     Private WithEvents FooterButton As CustomButton
@@ -49,9 +52,19 @@ Partial Public Class MainWindow : Inherits Window
                         Using reader As New StreamReader(pipeServer)
                             Dim arguments As String = Await reader.ReadLineAsync()
                             If arguments IsNot Nothing Then
-                                Window.WindowState = WindowState.Minimized
-                                Window.WindowState = WindowState.Normal
-                                Window.Activate()
+
+                                If Window.IsActive = False Then
+                                    Window.WindowState = WindowState.Minimized
+                                    Await Task.Delay(100)
+                                    Window.WindowState = WindowState.Normal
+                                    Window.Activate()
+                                End If
+
+                                'Window.Topmost = True
+                                'Window.WindowState = WindowState.Normal
+                                'Window.Activate()
+                                'Window.Topmost = False
+
                                 If arguments = "main" = False Then
                                     Await Clipboard.SetTextAsync(arguments)
                                     Await CheckClipboardLoginCodeAsync()
@@ -99,6 +112,7 @@ Partial Public Class MainWindow : Inherits Window
         LoginCodeButton = Window.FindNameScope.Find("LoginCodeButton")
         ChangeUpdateSourceButton = Window.FindNameScope.Find("ChangeUpdateSourceButton")
         ChangeUpdateSourceButton = Window.FindNameScope.Find("ChangeUpdateSourceButton")
+        HabboLogoButton = Window.FindNameScope.Find("HabboLogoButton")
         GithubButton = Window.FindNameScope.Find("GithubButton")
         SulakeButton = Window.FindNameScope.Find("SulakeButton")
         FooterButton = Window.FindNameScope.Find("FooterButton")
@@ -113,7 +127,7 @@ Partial Public Class MainWindow : Inherits Window
         FixWindowsTLS()
         RegisterHabboProtocol()
 
-        If RuntimeInformation.IsOSPlatform(OSPlatform.Linux) AndAlso RuntimeInformation.ProcessArchitecture = Architecture.Arm64 Then
+        If (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) Or RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD)) AndAlso RuntimeInformation.ProcessArchitecture = Architecture.Arm64 Then
             UnixPatchName = "HabboAirLinuxPatch_arm64.zip"
         End If
         If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
@@ -124,15 +138,19 @@ Partial Public Class MainWindow : Inherits Window
             If Argument.StartsWith("habbo://") Then
                 Argument = Argument.Remove(0, Argument.IndexOf("?server=") + 8)
                 Argument = Argument.Replace("&token=", ".")
-                Clipboard.SetTextAsync(Argument).Wait()
+                CopyToClipboard(Argument) 'Clipboard.SetTextAsync(Argument).Wait()
                 CheckClipboardLoginCodeAsync()
             End If
         Next
     End Sub
 
+    Public Async Sub CopyToClipboard(Argument As String)
+        Await Clipboard.SetTextAsync(Argument)
+    End Sub
+
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 12 (24/02/2025)"
+        FooterButton.Text = "CustomLauncher version 13 (26/02/2025)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -140,7 +158,11 @@ Partial Public Class MainWindow : Inherits Window
             DisplayLauncherVersionOnFooter()
         Else
             FooterButton.BackColor = Color.Parse("#8D31A500")
-            FooterButton.Text = AppTranslator.PlayingAs(CurrentLanguageInt) & " " & CurrentLoginCode.Username
+            Dim FinalUsername = CurrentLoginCode.Username
+            If FinalUsername.Length > 15 Then
+                FinalUsername = FinalUsername.Remove(15) & "..."
+            End If
+            FooterButton.Text = AppTranslator.PlayingAs(CurrentLanguageInt) & " " & FinalUsername
         End If
     End Function
 
@@ -310,6 +332,14 @@ Partial Public Class MainWindow : Inherits Window
         End Using
     End Sub
 
+    Public Async Sub CopyLinuxIcon(DestinationFolder As String)
+        Dim resourceName As String = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/HabboCustomLauncherIcon.png"
+        Dim resourceStream As Stream = AssetLoader.Open(New Uri(resourceName))
+        Using fileStream As FileStream = File.Create(Path.Combine(DestinationFolder, "HabboCustomLauncherIcon.png"))
+            resourceStream.CopyTo(fileStream)
+        End Using
+    End Sub
+
     Public Async Function DownloadRemoteFileAsync(RemoteFileUrl As String, DownloadFilePath As String) As Task(Of String)
         CurrentDownloadProgress = 0
         HttpClient.DefaultRequestHeaders.Clear()
@@ -352,9 +382,20 @@ Partial Public Class MainWindow : Inherits Window
                 CurrentLoginCode = ClipboardLoginCode
                 LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeDetected(CurrentLanguageInt) & " [" & ClipboardLoginCode.ServerId.Replace("hh", "").ToUpper & "]"
                 If OldLoginTicket = ClipboardLoginCode.SSOTicket = False Then
-                    Window.WindowState = WindowState.Minimized
-                    Window.WindowState = WindowState.Normal
-                    Window.Activate()
+
+
+                    If Window.IsActive = False Then
+                        Window.WindowState = WindowState.Minimized
+                        Await Task.Delay(100)
+                        Window.WindowState = WindowState.Normal
+                        Window.Activate()
+                    End If
+
+                    'Window.Topmost = True
+                    'Window.WindowState = WindowState.Normal
+                    'Window.Activate()
+                    'Window.Topmost = False
+
                     DisplayCurrentUserOnFooter()
                     Await UpdateClientButtonStatus()
                     Return True
@@ -514,6 +555,14 @@ Partial Public Class MainWindow : Inherits Window
                 End Using
                 Return True
             End If
+            If RuntimeInformation.IsOSPlatform(OSPlatform.Linux) Or RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD) Then
+                Dim processInfo As New ProcessStartInfo("xdg-mime", "default HabboCustomLauncher.desktop x-scheme-handler/habbo") With {
+                    .UseShellExecute = False,
+                    .CreateNoWindow = False
+                }
+                Process.Start(processInfo)?.WaitForExit()
+                Return True
+            End If
             Throw New Exception("Could not register protocol")
         Catch
             'MsgBox(AppTranslator.ProtocolRegError(CurrentLanguageInt), MsgBoxStyle.Critical, "Error")
@@ -596,9 +645,115 @@ Partial Public Class MainWindow : Inherits Window
         End Try
     End Sub
 
+    Private Sub HabboLogoButton_PointerEntered(sender As Object, e As Avalonia.Input.PointerEventArgs) Handles HabboLogoButton.PointerEntered
+        HabboLogoButton.Source = New Bitmap(AssetLoader.Open(New Uri("avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/habbo-logo-big-2.png")))
+    End Sub
+
+    Private Sub HabboLogoButton_PointerExited(sender As Object, e As Avalonia.Input.PointerEventArgs) Handles HabboLogoButton.PointerExited
+        HabboLogoButton.Source = New Bitmap(AssetLoader.Open(New Uri("avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/habbo-logo-big.png")))
+    End Sub
+
+    Private Sub GithubButton_PointerEntered(sender As Object, e As Avalonia.Input.PointerEventArgs) Handles GithubButton.PointerEntered
+        GithubButton.Source = New Bitmap(AssetLoader.Open(New Uri("avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/github-icon-2.png")))
+    End Sub
+
+    Private Sub GithubButton_PointerExited(sender As Object, e As Avalonia.Input.PointerEventArgs) Handles GithubButton.PointerExited
+        GithubButton.Source = New Bitmap(AssetLoader.Open(New Uri("avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/github-icon.png")))
+    End Sub
+
+    Private Sub SulakeButtonButton_PointerEntered(sender As Object, e As Avalonia.Input.PointerEventArgs) Handles SulakeButton.PointerEntered
+        SulakeButton.Source = New Bitmap(AssetLoader.Open(New Uri("avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/habbo-footer-2.png")))
+    End Sub
+
+    Private Sub SulakeButtonButton_PointerExited(sender As Object, e As Avalonia.Input.PointerEventArgs) Handles SulakeButton.PointerExited
+        SulakeButton.Source = New Bitmap(AssetLoader.Open(New Uri("avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/habbo-footer.png")))
+    End Sub
+
     Private Sub MainWindow_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
         If NamedPipeCancellationTokenSource.IsCancellationRequested = False Then
             StopPipedLoginTicketListener()
+        End If
+    End Sub
+
+    Private Sub HabboLogoButton_PointerPressed(sender As Object, e As Avalonia.Input.PointerPressedEventArgs) Handles HabboLogoButton.PointerPressed
+        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Or RuntimeInformation.IsOSPlatform(OSPlatform.Linux) Or RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD) Then
+            Dim AddDesktopShortcutMenuItem As New MenuItem With {.Header = AppTranslator.AddDesktopShortcut(CurrentLanguageInt)}
+            AddHandler AddDesktopShortcutMenuItem.Click, AddressOf AddDesktopShortcut
+
+            Dim AddStartMenuShortcutMenuItem As New MenuItem With {.Header = AppTranslator.AddStartMenuShortcut(CurrentLanguageInt)}
+            AddHandler AddStartMenuShortcutMenuItem.Click, AddressOf AddStartMenuShortcut
+
+            'Dim ToggleAutomaticHabboProtocolMenuItem As New MenuItem With {.Header = AppTranslator.AutomaticHabboProtocol(CurrentLanguageInt) & " (" & AppTranslator.Enabled(CurrentLanguageInt).ToLower & ")"}
+            'AddHandler ToggleAutomaticHabboProtocolMenuItem.Click, AddressOf ToggleAutomaticHabboProtocol
+
+            Dim contextMenu As New ContextMenu
+            contextMenu.Items.Add(AddDesktopShortcutMenuItem)
+            contextMenu.Items.Add(AddStartMenuShortcutMenuItem)
+            'contextMenu.Items.Add(ToggleAutomaticHabboProtocolMenuItem)
+            If HabboLogoButton.ContextMenu IsNot Nothing Then
+                HabboLogoButton.ContextMenu.Close()
+            End If
+            HabboLogoButton.ContextMenu = contextMenu
+            HabboLogoButton.ContextMenu.Open()
+        Else
+            Dim contextMenu As New ContextMenu
+            contextMenu.Items.Add(New MenuItem With {.Header = "Advanced options are not yet available on OSX!"})
+            If HabboLogoButton.ContextMenu IsNot Nothing Then
+                HabboLogoButton.ContextMenu.Close()
+            End If
+            HabboLogoButton.ContextMenu = contextMenu
+            HabboLogoButton.ContextMenu.Open()
+        End If
+    End Sub
+
+    Private Sub AddDesktopShortcut()
+        CreateShortcut(Environment.ProcessPath, "HabboCustomLauncherBeta", True)
+    End Sub
+
+    Private Sub AddStartMenuShortcut()
+        CreateShortcut(Environment.ProcessPath, "HabboCustomLauncher", False)
+    End Sub
+
+    Sub ToggleAutomaticHabboProtocol()
+        'TODO
+    End Sub
+
+    Sub CreateShortcut(appPath As String, appName As String, isDesktop As Boolean)
+        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
+            Using shortcut = New WindowsShortcut With {.Path = appPath}
+                If isDesktop Then
+                    shortcut.Save(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), appName & ".lnk"))
+                Else
+                    Dim StartMenuPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs")
+                    Directory.CreateDirectory(StartMenuPath)
+                    shortcut.Save(Path.Combine(StartMenuPath, appName & ".lnk"))
+                End If
+            End Using
+        ElseIf RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+            'Dim desktopPath As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), appName)
+            'Dim process = System.Diagnostics.Process.Start("ln", $"-s ""{appPath}"" ""{desktopPath}""")
+            'process.WaitForExit()
+            Console.WriteLine("Not implemented yet!")
+        Else 'Linux
+            Dim ShortcutPath As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop")
+            Dim IconsPath As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".icons")
+            If isDesktop = False Then
+                ShortcutPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "applications")
+            End If
+            Dim shortcutContent As String =
+                $"[Desktop Entry]
+                Type=Application
+                Name={appName}
+                Exec=""{appPath}"" %U
+                Terminal=false
+                Icon=HabboCustomLauncherIcon.png
+                Categories=Game;
+                MimeType=x-scheme-handler/habbo;".Replace("                ", "")
+            Directory.CreateDirectory(IconsPath)
+            Directory.CreateDirectory(ShortcutPath)
+            CopyLinuxIcon(IconsPath)
+            File.WriteAllText(Path.Combine(ShortcutPath, appName & ".desktop"), shortcutContent)
+            MakeUnixExecutable(Path.Combine(ShortcutPath, appName & ".desktop"))
         End If
     End Sub
 End Class
@@ -744,5 +899,25 @@ Public Class AppTranslator
     Public Shared LaunchClientVersion As String() = {
         "Launch client version",
         "Ejecutar cliente version"
+    }
+    Public Shared Enabled As String() = {
+        "Enabled",
+        "Habilitado"
+    }
+    Public Shared Disabled As String() = {
+        "Disabled",
+        "Deshabilitado"
+    }
+    Public Shared AddDesktopShortcut As String() = {
+        "Add shortcut to desktop",
+        "Añadir acceso directo al escritorio"
+    }
+    Public Shared AddStartMenuShortcut As String() = {
+        "Add shortcut to start menu",
+        "Añadir acceso directo al menu de inicio"
+    }
+    Public Shared AutomaticHabboProtocol As String() = {
+        "Automatic habbo protocol",
+        "Habbo protocol automatico"
     }
 End Class
