@@ -556,6 +556,7 @@ Partial Public Class MainWindow : Inherits Window
                 Return True
             End If
             If RuntimeInformation.IsOSPlatform(OSPlatform.Linux) Or RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD) Then
+                AddStartMenuShortcut() 'xdg protocol association requires an start menu shortcut
                 Dim processInfo As New ProcessStartInfo("xdg-mime", "default HabboCustomLauncher.desktop x-scheme-handler/habbo") With {
                     .UseShellExecute = False,
                     .CreateNoWindow = False
