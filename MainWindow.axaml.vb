@@ -647,10 +647,16 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Private Sub HabboLogoButton_PointerEntered(sender As Object, e As Avalonia.Input.PointerEventArgs) Handles HabboLogoButton.PointerEntered
+        If HabboLogoButton.ContextMenu IsNot Nothing AndAlso HabboLogoButton.ContextMenu.IsOpen Then
+            Return
+        End If
         HabboLogoButton.Source = New Bitmap(AssetLoader.Open(New Uri("avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/habbo-logo-big-2.png")))
     End Sub
 
     Private Sub HabboLogoButton_PointerExited(sender As Object, e As Avalonia.Input.PointerEventArgs) Handles HabboLogoButton.PointerExited
+        If HabboLogoButton.ContextMenu IsNot Nothing AndAlso HabboLogoButton.ContextMenu.IsOpen Then
+            Return
+        End If
         HabboLogoButton.Source = New Bitmap(AssetLoader.Open(New Uri("avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/habbo-logo-big.png")))
     End Sub
 
@@ -676,6 +682,10 @@ Partial Public Class MainWindow : Inherits Window
         End If
     End Sub
 
+    Private Sub HabboLogoButton_ContextMenuClosed(sender As Object, e As EventArgs)
+        HabboLogoButton_PointerExited(Nothing, Nothing)
+    End Sub
+
     Private Sub HabboLogoButton_PointerPressed(sender As Object, e As Avalonia.Input.PointerPressedEventArgs) Handles HabboLogoButton.PointerPressed
         If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Or RuntimeInformation.IsOSPlatform(OSPlatform.Linux) Or RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD) Then
             Dim AddDesktopShortcutMenuItem As New MenuItem With {.Header = AppTranslator.AddDesktopShortcut(CurrentLanguageInt)}
@@ -693,8 +703,10 @@ Partial Public Class MainWindow : Inherits Window
             'contextMenu.Items.Add(ToggleAutomaticHabboProtocolMenuItem)
             If HabboLogoButton.ContextMenu IsNot Nothing Then
                 HabboLogoButton.ContextMenu.Close()
+                HabboLogoButton.ContextMenu = Nothing
             End If
             HabboLogoButton.ContextMenu = contextMenu
+            AddHandler HabboLogoButton.ContextMenu.Closed, AddressOf HabboLogoButton_ContextMenuClosed
             HabboLogoButton.ContextMenu.Open()
         Else
             Dim contextMenu As New ContextMenu
