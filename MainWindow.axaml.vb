@@ -748,7 +748,10 @@ Partial Public Class MainWindow : Inherits Window
             'process.WaitForExit()
             Console.WriteLine("Not implemented yet!")
         Else 'Linux
-            Dim ShortcutPath As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop")
+            Dim ShortcutPath As String = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
+            If String.IsNullOrWhiteSpace(ShortcutPath) Then
+                ShortcutPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop")
+            End If
             Dim IconsPath As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".icons")
             If isDesktop = False Then
                 ShortcutPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "applications")
