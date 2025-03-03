@@ -40,7 +40,7 @@ Partial Public Class MainWindow : Inherits Window
     Public WindowsPatchName As String = "HabboAirWindowsPatch_x86.zip"
     Public AirPlusPatchName As String = "HabboAirPlusPatch.zip"
     Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
-    Public LatestHabboAirPlusSwfEtag As String = "a_complete_unknown"
+    Public LatestClientEtag As String = ""
 
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
 
@@ -264,6 +264,21 @@ Partial Public Class MainWindow : Inherits Window
         End Using
     End Sub
 
+    Public Sub ExtractTrimmedOfficialAirClient(FullClientZipFile As String, ClientFolderPath As String)
+        Dim itemsToSkip As New List(Of String) From {"Adobe AIR", "META-INF/signatures.xml", "META-INF/AIR/hash", "Habbo.exe"}
+        Using archive As ZipArchive = ZipFile.OpenRead(FullClientZipFile)
+            For Each entry As ZipArchiveEntry In archive.Entries
+                If itemsToSkip.Any(Function(item) entry.FullName.StartsWith(item, StringComparison.OrdinalIgnoreCase)) = False Then
+                    Dim fullPath As String = Path.Combine(ClientFolderPath, entry.FullName)
+                    Dim mydirectory = Path.GetDirectoryName(fullPath)
+                    Directory.CreateDirectory(mydirectory)
+                    If Directory.Exists(fullPath) = False Then
+                        entry.ExtractToFile(fullPath, overwrite:=True)
+                    End If
+                End If
+            Next
+        End Using
+    End Sub
 
     Public Async Function UpdateClient() As Task
         Try
@@ -290,37 +305,19 @@ Partial Public Class MainWindow : Inherits Window
                 Await Task.Run(Sub() CopyEmbeddedAsset(AirPlusPatchName, ClientFolderPath))
                 Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, AirPlusPatchName), ClientFolderPath, True))
                 File.Delete(Path.Combine(ClientFolderPath, AirPlusPatchName))
-                Await Task.Run(Sub() CopyEmbeddedAsset(GetAirPatchNameForCurrentOS, ClientFolderPath))
-                Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS), ClientFolderPath, True))
-                File.Delete(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS))
-                UpdateAirApplicationXML()
-                File.WriteAllText(Path.Combine(ClientFolderPath, "ETag.txt"), LatestHabboAirPlusSwfEtag)
             Else
-                Dim itemsToSkip As New List(Of String) From {"Adobe AIR", "META-INF/signatures.xml", "META-INF/AIR/hash", "Habbo.exe"}
-                Using archive As ZipArchive = ZipFile.OpenRead(ClientFilePath)
-                    For Each entry As ZipArchiveEntry In archive.Entries
-                        If itemsToSkip.Any(Function(item) entry.FullName.StartsWith(item, StringComparison.OrdinalIgnoreCase)) = False Then
-                            Dim fullPath As String = Path.Combine(ClientFolderPath, entry.FullName)
-                            Dim mydirectory = Path.GetDirectoryName(fullPath)
-                            Directory.CreateDirectory(mydirectory)
-                            If Directory.Exists(fullPath) = False Then
-                                Await Task.Run(Sub() entry.ExtractToFile(fullPath, overwrite:=True))
-                            End If
-                        End If
-                    Next
-                End Using
+                Await Task.Run(Sub() ExtractTrimmedOfficialAirClient(ClientFilePath, ClientFolderPath))
                 Await Task.Run(Sub() File.Delete(ClientFilePath))
-                Await Task.Run(Sub() CopyEmbeddedAsset(GetAirPatchNameForCurrentOS, ClientFolderPath))
-                Await Task.Run(Sub() ZipFile.ExtractToDirectory(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS), ClientFolderPath, True))
-                File.Delete(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS))
-                UpdateAirApplicationXML()
-                If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then 'OSX
-                    FixOSXClientStructure()
-                    MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"))
-                ElseIf RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False Then
-                    MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo")) 'Linux
-                End If
             End If
+
+
+            Await Task.Run(Sub() CopyEmbeddedAsset(GetAirPatchNameForCurrentOS, ClientFolderPath))
+            Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS), ClientFolderPath, True))
+            File.Delete(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS))
+            UpdateAirApplicationXML()
+            File.WriteAllText(Path.Combine(ClientFolderPath, "ETag.txt"), LatestClientEtag)
+
+
             StartNewInstanceButton.IsButtonDisabled = False
             StartNewInstanceButton2.IsButtonDisabled = False
             ChangeUpdateSourceButton.IsButtonDisabled = False
@@ -372,7 +369,7 @@ Partial Public Class MainWindow : Inherits Window
         Dim NewXmlPath As String = Path.Combine(ClientFolderPath, "application.xml")
         Dim xmlDoc As New XDocument()
         If UpdateSource = "AIR_Plus" Then
-            OriginalXmlVersionNumber = "1"
+            OriginalXmlVersionNumber = "1.0"
         Else
             xmlDoc = XDocument.Load(OriginalXmlPath)
             OriginalXmlVersionNumber = xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "versionLabel")
@@ -497,7 +494,7 @@ Partial Public Class MainWindow : Inherits Window
         End If
     End Function
 
-    Public Function IsAirPlusEtagMatch(Etag As String) As Boolean
+    Public Function IsClientEtagMatch(Etag As String) As Boolean
         Try
             Return File.ReadAllText(Path.Combine(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), "ETag.txt")) = Etag
         Catch
@@ -514,13 +511,14 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton.Text = AppTranslator.ClientUpdatesCheck(CurrentLanguageInt)
             If UpdateSource = "AIR_Official" Then
                 CurrentClientUrls = New JsonClientUrls(Await GetRemoteJsonAsync("https://" & CurrentLoginCode.ServerUrl & "/gamedata/clienturls"))
-                IsClientUpdated = Directory.Exists(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)) 'Asumir que el cliente existe y sea valido solo por existir el directorio no es buena practica, habria que cambiarlo por otro metodo
+                LatestClientEtag = "a_complete_unknown"
+                IsClientUpdated = Directory.Exists(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)) AndAlso IO.File.Exists(Path.Combine(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), "ETag.txt"))
             End If
             If UpdateSource = "AIR_Plus" Then
                 CurrentClientUrls = New JsonClientUrls("{'flash-windows-version':'latest','flash-windows':'https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf'}".Replace("'", Chr(34)))
                 Dim AirPlusClientEtag = Await GetRemoteEtag(CurrentClientUrls.FlashWindowsUrl)
-                LatestHabboAirPlusSwfEtag = AirPlusClientEtag
-                IsClientUpdated = IsAirPlusEtagMatch(AirPlusClientEtag)
+                LatestClientEtag = AirPlusClientEtag
+                IsClientUpdated = IsClientEtagMatch(AirPlusClientEtag)
             End If
 
             'Await CleanDeprecatedClients() 'No se si lo ideal seria ponerlo aca o solo en UpdateClient, lo malo seria que de esa forma si un cliente se actualiza a un server actualiza a una version de cliente ya existe entonces no se eliminaria la version anterior a menos que se vuelva a actualizar.
