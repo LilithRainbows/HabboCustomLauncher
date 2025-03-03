@@ -280,6 +280,12 @@ Partial Public Class MainWindow : Inherits Window
         End Using
     End Sub
 
+    Sub ReplaceSwfVersion(rutaArchivo As String, nuevoValorInt As Integer)
+        Dim datos As Byte() = File.ReadAllBytes(rutaArchivo)
+        datos(3) = CByte(nuevoValorInt)
+        File.WriteAllBytes(rutaArchivo, datos)
+    End Sub
+
     Public Async Function UpdateClient() As Task
         Try
             Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
@@ -301,6 +307,11 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton.Text = AppTranslator.ExtractingClient(CurrentLanguageInt)
 
 
+            Await Task.Run(Sub() CopyEmbeddedAsset(GetAirPatchNameForCurrentOS, ClientFolderPath))
+            Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS), ClientFolderPath, True))
+            File.Delete(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS))
+
+
             If UpdateSource = "AIR_Plus" Then
                 Await Task.Run(Sub() CopyEmbeddedAsset(AirPlusPatchName, ClientFolderPath))
                 Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, AirPlusPatchName), ClientFolderPath, True))
@@ -311,12 +322,13 @@ Partial Public Class MainWindow : Inherits Window
             End If
 
 
-            Await Task.Run(Sub() CopyEmbeddedAsset(GetAirPatchNameForCurrentOS, ClientFolderPath))
-            Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS), ClientFolderPath, True))
-            File.Delete(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS))
             UpdateAirApplicationXML()
-            File.WriteAllText(Path.Combine(ClientFolderPath, "ETag.txt"), LatestClientEtag)
+            If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+                ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 50) 'OSX is limited to AIR version 50.2.3.8 to provide compatibility with OSX 10.12+, so the swf version will be forced to 50
+                FixOSXClientStructure()
+            End If
 
+            File.WriteAllText(Path.Combine(ClientFolderPath, "ETag.txt"), LatestClientEtag)
 
             StartNewInstanceButton.IsButtonDisabled = False
             StartNewInstanceButton2.IsButtonDisabled = False
@@ -332,7 +344,7 @@ Partial Public Class MainWindow : Inherits Window
         End Try
     End Function
 
-    Public Async Sub FixOSXClientStructure()
+    Public Sub FixOSXClientStructure()
         ' Rutas de origen y destino
         Dim origen As String = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
         Dim destino As String = Path.Combine(origen, "Habbo.app", "Contents", "Resources")
@@ -362,7 +374,7 @@ Partial Public Class MainWindow : Inherits Window
         Next
     End Sub
 
-    Public Async Sub UpdateAirApplicationXML()
+    Public Sub UpdateAirApplicationXML()
         Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
         Dim OriginalXmlPath As String = Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")
         Dim OriginalXmlVersionNumber As String
