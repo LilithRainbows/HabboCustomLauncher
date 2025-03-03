@@ -324,6 +324,14 @@ Partial Public Class MainWindow : Inherits Window
         File.Delete(NewXmlPath)
     End Sub
 
+    Public Async Sub CopyLauncherShortcutOSXPatch(DestinationFolder As String)
+        Dim resourceName As String = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/LauncherShortcutOSXPatch.zip"
+        Dim resourceStream As Stream = AssetLoader.Open(New Uri(resourceName))
+        Using fileStream As FileStream = File.Create(Path.Combine(DestinationFolder, "LauncherShortcutOSXPatch.zip"))
+            resourceStream.CopyTo(fileStream)
+        End Using
+    End Sub
+
     Public Async Sub CopyLinuxPatch(DestinationFolder As String)
         Dim resourceName As String = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/" & UnixPatchName
         Dim resourceStream As Stream = AssetLoader.Open(New Uri(resourceName))
@@ -687,36 +695,26 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Private Sub HabboLogoButton_PointerPressed(sender As Object, e As Avalonia.Input.PointerPressedEventArgs) Handles HabboLogoButton.PointerPressed
-        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Or RuntimeInformation.IsOSPlatform(OSPlatform.Linux) Or RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD) Then
-            Dim AddDesktopShortcutMenuItem As New MenuItem With {.Header = AppTranslator.AddDesktopShortcut(CurrentLanguageInt)}
-            AddHandler AddDesktopShortcutMenuItem.Click, AddressOf AddDesktopShortcut
+        Dim AddDesktopShortcutMenuItem As New MenuItem With {.Header = AppTranslator.AddDesktopShortcut(CurrentLanguageInt)}
+        AddHandler AddDesktopShortcutMenuItem.Click, AddressOf AddDesktopShortcut
 
-            Dim AddStartMenuShortcutMenuItem As New MenuItem With {.Header = AppTranslator.AddStartMenuShortcut(CurrentLanguageInt)}
-            AddHandler AddStartMenuShortcutMenuItem.Click, AddressOf AddStartMenuShortcut
+        Dim AddStartMenuShortcutMenuItem As New MenuItem With {.Header = AppTranslator.AddStartMenuShortcut(CurrentLanguageInt)}
+        AddHandler AddStartMenuShortcutMenuItem.Click, AddressOf AddStartMenuShortcut
 
-            'Dim ToggleAutomaticHabboProtocolMenuItem As New MenuItem With {.Header = AppTranslator.AutomaticHabboProtocol(CurrentLanguageInt) & " (" & AppTranslator.Enabled(CurrentLanguageInt).ToLower & ")"}
-            'AddHandler ToggleAutomaticHabboProtocolMenuItem.Click, AddressOf ToggleAutomaticHabboProtocol
+        'Dim ToggleAutomaticHabboProtocolMenuItem As New MenuItem With {.Header = AppTranslator.AutomaticHabboProtocol(CurrentLanguageInt) & " (" & AppTranslator.Enabled(CurrentLanguageInt).ToLower & ")"}
+        'AddHandler ToggleAutomaticHabboProtocolMenuItem.Click, AddressOf ToggleAutomaticHabboProtocol
 
-            Dim contextMenu As New ContextMenu
-            contextMenu.Items.Add(AddDesktopShortcutMenuItem)
-            contextMenu.Items.Add(AddStartMenuShortcutMenuItem)
-            'contextMenu.Items.Add(ToggleAutomaticHabboProtocolMenuItem)
-            If HabboLogoButton.ContextMenu IsNot Nothing Then
-                HabboLogoButton.ContextMenu.Close()
-                HabboLogoButton.ContextMenu = Nothing
-            End If
-            HabboLogoButton.ContextMenu = contextMenu
-            AddHandler HabboLogoButton.ContextMenu.Closed, AddressOf HabboLogoButton_ContextMenuClosed
-            HabboLogoButton.ContextMenu.Open()
-        Else
-            Dim contextMenu As New ContextMenu
-            contextMenu.Items.Add(New MenuItem With {.Header = "Advanced options are not yet available on OSX!"})
-            If HabboLogoButton.ContextMenu IsNot Nothing Then
-                HabboLogoButton.ContextMenu.Close()
-            End If
-            HabboLogoButton.ContextMenu = contextMenu
-            HabboLogoButton.ContextMenu.Open()
+        Dim contextMenu As New ContextMenu
+        contextMenu.Items.Add(AddDesktopShortcutMenuItem)
+        contextMenu.Items.Add(AddStartMenuShortcutMenuItem)
+        'contextMenu.Items.Add(ToggleAutomaticHabboProtocolMenuItem)
+        If HabboLogoButton.ContextMenu IsNot Nothing Then
+            HabboLogoButton.ContextMenu.Close()
+            HabboLogoButton.ContextMenu = Nothing
         End If
+        HabboLogoButton.ContextMenu = contextMenu
+        AddHandler HabboLogoButton.ContextMenu.Closed, AddressOf HabboLogoButton_ContextMenuClosed
+        HabboLogoButton.ContextMenu.Open()
     End Sub
 
     Private Sub AddDesktopShortcut()
@@ -743,10 +741,32 @@ Partial Public Class MainWindow : Inherits Window
                 End If
             End Using
         ElseIf RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
-            'Dim desktopPath As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), appName)
-            'Dim process = System.Diagnostics.Process.Start("ln", $"-s ""{appPath}"" ""{desktopPath}""")
-            'process.WaitForExit()
-            Console.WriteLine("Not implemented yet!")
+
+            Dim OSXDownloadFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")
+                CopyLauncherShortcutOSXPatch(OSXDownloadFolder)
+
+                ZipFile.ExtractToDirectory(Path.Combine(OSXDownloadFolder, "LauncherShortcutOSXPatch.zip"), OSXDownloadFolder)
+                File.Delete(Path.Combine(OSXDownloadFolder, "LauncherShortcutOSXPatch.zip"))
+
+                Dim scriptPath As String = Path.Combine(OSXDownloadFolder, "HabboCustomLauncherShortcut.sh")
+
+                Dim originalScriptContent = File.ReadAllText(scriptPath, New Text.UTF8Encoding(False))
+                originalScriptContent = originalScriptContent.Replace("%HabboCustomLauncherAppPath%", appPath)
+                If isDesktop Then
+                    originalScriptContent = originalScriptContent.Replace("/Applications/", "$HOME/Desktop/")
+                End If
+                File.WriteAllText(scriptPath, originalScriptContent, New Text.UTF8Encoding(False))
+
+                MakeUnixExecutable(scriptPath)
+                Dim process As New Process()
+                process.StartInfo.FileName = "/bin/bash"
+                process.StartInfo.Arguments = "-c """"" & scriptPath & """"""
+                process.StartInfo.UseShellExecute = False
+                process.StartInfo.CreateNoWindow = True
+                process.Start()
+                process.WaitForExit()
+            File.Delete(Path.Combine(OSXDownloadFolder, "HabboCustomLauncherShortcut.sh"))
+
         Else 'Linux
             Dim ShortcutPath As String = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
             If String.IsNullOrWhiteSpace(ShortcutPath) Then

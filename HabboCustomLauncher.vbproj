@@ -41,10 +41,12 @@
 
   <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64'">
     <AvaloniaResource Include="Assets\HabboAirOSXPatch.zip" />
+    <AvaloniaResource Include="Assets\LauncherShortcutOSXPatch.zip" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-arm64'">
     <AvaloniaResource Include="Assets\HabboAirOSXPatch.zip" />
+    <AvaloniaResource Include="Assets\LauncherShortcutOSXPatch.zip" />
   </ItemGroup>
 
   <ItemGroup>
