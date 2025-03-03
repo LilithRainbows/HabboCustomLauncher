@@ -18,7 +18,6 @@ Imports WindowsShortcutFactory
 
 'PROBLEMA: Como se puede hacer para que se pueda definir manualmente un login code en lugar de solo leerlo desde el clipboard?
 'SOLUCION: Al hacer click al boton se pregunta para introducir manualmente el codigo (aunque seria innecesario), mejor preguntar que hotel lanzar directamente? o tambien es innecesario? si todo es innecesario capaz convenga hacer que deje de ser un boton y pase a ser un label
-'Quizas habria que revisar en https://images.habbo.com/habbo-native-clients/launcher/clientversions.json para purgar versiones ya invalidas
 
 Partial Public Class MainWindow : Inherits Window
     Private WithEvents Window As Window
@@ -37,7 +36,11 @@ Partial Public Class MainWindow : Inherits Window
     Public CurrentLanguageInt As Integer = 0
     Private ReadOnly HttpClient As New HttpClient()
     Private NamedPipeCancellationTokenSource As CancellationTokenSource
-    Public UnixPatchName As String = "HabboAirLinuxPatch_x64.zip"
+    Public UnixPatchName As String = "HabboAirLinuxPatch_x64.zip" 'Depending on the platform, it can automatically become HabboAirLinuxPatch_x64.zip and HabboAirOSXPatch.zip
+    Public WindowsPatchName As String = "HabboAirWindowsPatch_x86.zip"
+    Public AirPlusPatchName As String = "HabboAirPlusPatch.zip"
+    Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
+    Public LatestHabboAirPlusSwfEtag As String = "a_complete_unknown"
 
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
 
@@ -144,6 +147,14 @@ Partial Public Class MainWindow : Inherits Window
         Next
     End Sub
 
+    Public Function GetAirPatchNameForCurrentOS() As String
+        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
+            Return WindowsPatchName
+        Else
+            Return UnixPatchName
+        End If
+    End Function
+
     Public Async Sub CopyToClipboard(Argument As String)
         Await Clipboard.SetTextAsync(Argument)
     End Sub
@@ -170,18 +181,21 @@ Partial Public Class MainWindow : Inherits Window
         If StartNewInstanceButton.Text = AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt) Then
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
+            ChangeUpdateSourceButton.IsButtonDisabled = True
             FocusManager.ClearFocus()
             UpdateClientButtonStatus()
         End If
         If StartNewInstanceButton.Text.StartsWith(AppTranslator.UpdateClientVersion(CurrentLanguageInt)) Then
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
+            ChangeUpdateSourceButton.IsButtonDisabled = True
             FocusManager.ClearFocus()
             UpdateClient()
         End If
         If StartNewInstanceButton.Text.StartsWith(AppTranslator.LaunchClientVersion(CurrentLanguageInt)) Then
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
+            ChangeUpdateSourceButton.IsButtonDisabled = True
             FocusManager.ClearFocus()
             LaunchClient()
         End If
@@ -194,7 +208,7 @@ Partial Public Class MainWindow : Inherits Window
                 ClientProcess.StartInfo.FileName = Path.Combine(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), "Habbo.exe")
             End If
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then 'OSX
-                ClientProcess.StartInfo.FileName = Path.Combine(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), "Habbo.app/Contents/MacOS/Habbo")
+                ClientProcess.StartInfo.FileName = Path.Combine(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), "Habbo.app", "Contents", "MacOS", "Habbo")
             Else 'Linux
                 ClientProcess.StartInfo.FileName = Path.Combine(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), "Habbo")
             End If
@@ -204,6 +218,7 @@ Partial Public Class MainWindow : Inherits Window
         Catch
             StartNewInstanceButton.IsButtonDisabled = False
             StartNewInstanceButton2.IsButtonDisabled = False
+            ChangeUpdateSourceButton.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.LaunchClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
         End Try
     End Function
@@ -215,31 +230,71 @@ Partial Public Class MainWindow : Inherits Window
                                                         UnixFileMode.GroupRead Or
                                                         UnixFileMode.OtherRead
             File.SetUnixFileMode(filePath, executablePermissions)
-            Return True ' Éxito
+            Return True ' Exito
         Catch ex As Exception
             Console.WriteLine($"Error while making executable: {ex.Message}")
             Return False ' Fallo
         End Try
     End Function
 
+    Public Sub UnzipIgnoringIOExceptions(sourcezip As String, destinationfolder As String, overwrite As Boolean)
+        Using archive As ZipArchive = ZipFile.OpenRead(sourcezip)
+            For Each entry As ZipArchiveEntry In archive.Entries
+                Try
+                    Dim destinationFilePath As String = Path.Combine(destinationfolder, entry.FullName.Replace("/", Path.DirectorySeparatorChar).Replace("\\", Path.DirectorySeparatorChar))
+
+                    ' Verificar si es un directorio y crearlo
+                    If destinationFilePath.EndsWith(Path.DirectorySeparatorChar) Then
+                        Directory.CreateDirectory(destinationFilePath)
+                        Continue For ' No intentar extraer directorios
+                    End If
+
+                    ' Crear directorios padre si no existen
+                    Dim destinationDir As String = Path.GetDirectoryName(destinationFilePath)
+                    If Not Directory.Exists(destinationDir) Then
+                        Directory.CreateDirectory(destinationDir)
+                    End If
+
+                    ' Extraer el archivo
+                    entry.ExtractToFile(destinationFilePath, overwrite)
+                Catch ex As IOException
+                    'Console.WriteLine($"No se pudo extraer {entry.FullName}: {ex.Message}")
+                End Try
+            Next
+        End Using
+    End Sub
+
+
     Public Async Function UpdateClient() As Task
         Try
             Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
             Dim ClientFilePath = Path.Combine(ClientFolderPath, "ClientDownload.zip")
+            If UpdateSource = "AIR_Plus" Then
+                ClientFilePath = Path.Combine(ClientFolderPath, "HabboAir.swf")
+            End If
             Dim DownloadingClientHint = AppTranslator.DownloadingClient(CurrentLanguageInt)
             StartNewInstanceButton.Text = DownloadingClientHint
-            IO.Directory.CreateDirectory(ClientFolderPath)
+            Directory.CreateDirectory(ClientFolderPath)
 
-            Dim umaka = DownloadRemoteFileAsync(CurrentClientUrls.FlashWindowsUrl, ClientFilePath)
+
+            Dim ClientUrl = CurrentClientUrls.FlashWindowsUrl
+            Dim umaka = DownloadRemoteFileAsync(ClientUrl, ClientFilePath)
             Do Until umaka.IsCompleted
                 StartNewInstanceButton.Text = DownloadingClientHint & " (" & CurrentDownloadProgress & "%)"
                 Await Task.Delay(100)
             Loop
             StartNewInstanceButton.Text = AppTranslator.ExtractingClient(CurrentLanguageInt)
 
-            If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
-                Await Task.Run(Sub() ZipFile.ExtractToDirectory(ClientFilePath, GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)))
-                Await Task.Run(Sub() File.Delete(ClientFilePath))
+
+            If UpdateSource = "AIR_Plus" Then
+                Await Task.Run(Sub() CopyEmbeddedAsset(AirPlusPatchName, ClientFolderPath))
+                Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, AirPlusPatchName), ClientFolderPath, True))
+                File.Delete(Path.Combine(ClientFolderPath, AirPlusPatchName))
+                Await Task.Run(Sub() CopyEmbeddedAsset(GetAirPatchNameForCurrentOS, ClientFolderPath))
+                Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS), ClientFolderPath, True))
+                File.Delete(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS))
+                UpdateAirApplicationXML()
+                File.WriteAllText(Path.Combine(ClientFolderPath, "ETag.txt"), LatestHabboAirPlusSwfEtag)
             Else
                 Dim itemsToSkip As New List(Of String) From {"Adobe AIR", "META-INF/signatures.xml", "META-INF/AIR/hash", "Habbo.exe"}
                 Using archive As ZipArchive = ZipFile.OpenRead(ClientFilePath)
@@ -255,27 +310,27 @@ Partial Public Class MainWindow : Inherits Window
                     Next
                 End Using
                 Await Task.Run(Sub() File.Delete(ClientFilePath))
-                CopyLinuxPatch(ClientFolderPath)
-                Await Task.Run(Sub() ZipFile.ExtractToDirectory(Path.Combine(ClientFolderPath, UnixPatchName), ClientFolderPath))
-                File.Delete(Path.Combine(ClientFolderPath, UnixPatchName))
-                UpdateUnixApplicationXML()
+                Await Task.Run(Sub() CopyEmbeddedAsset(GetAirPatchNameForCurrentOS, ClientFolderPath))
+                Await Task.Run(Sub() ZipFile.ExtractToDirectory(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS), ClientFolderPath, True))
+                File.Delete(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS))
+                UpdateAirApplicationXML()
                 If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then 'OSX
                     FixOSXClientStructure()
-                    MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo.app/Contents/MacOS/Habbo"))
-                Else
+                    MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"))
+                ElseIf RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False Then
                     MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo")) 'Linux
                 End If
             End If
-
             StartNewInstanceButton.IsButtonDisabled = False
             StartNewInstanceButton2.IsButtonDisabled = False
+            ChangeUpdateSourceButton.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.LaunchClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
         Catch ex As Exception
             'StartNewInstanceButton.BackColor = Colors.Red
             StartNewInstanceButton.IsButtonDisabled = False
             StartNewInstanceButton2.IsButtonDisabled = False
+            ChangeUpdateSourceButton.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.UpdateClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
-
             'Clipboard.SetTextAsync(ex.ToString)
         End Try
     End Function
@@ -283,7 +338,7 @@ Partial Public Class MainWindow : Inherits Window
     Public Async Sub FixOSXClientStructure()
         ' Rutas de origen y destino
         Dim origen As String = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
-        Dim destino As String = Path.Combine(origen, "Habbo.app/Contents/Resources")
+        Dim destino As String = Path.Combine(origen, "Habbo.app", "Contents", "Resources")
 
         ' Exclusiones
         Dim carpetaExcluida As String = "Habbo.app"
@@ -310,13 +365,18 @@ Partial Public Class MainWindow : Inherits Window
         Next
     End Sub
 
-    Public Async Sub UpdateUnixApplicationXML()
+    Public Async Sub UpdateAirApplicationXML()
         Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
-        Dim OriginalXmlPath As String = Path.Combine(ClientFolderPath, "META-INF/AIR/application.xml")
+        Dim OriginalXmlPath As String = Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")
         Dim OriginalXmlVersionNumber As String
         Dim NewXmlPath As String = Path.Combine(ClientFolderPath, "application.xml")
-        Dim xmlDoc As XDocument = XDocument.Load(OriginalXmlPath)
-        OriginalXmlVersionNumber = xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "versionLabel")
+        Dim xmlDoc As New XDocument()
+        If UpdateSource = "AIR_Plus" Then
+            OriginalXmlVersionNumber = "1"
+        Else
+            xmlDoc = XDocument.Load(OriginalXmlPath)
+            OriginalXmlVersionNumber = xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "versionLabel")
+        End If
         xmlDoc = XDocument.Load(NewXmlPath)
         xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "versionLabel").Value = OriginalXmlVersionNumber ' Reemplaza con el nuevo valor
         xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "versionNumber").Value = OriginalXmlVersionNumber ' Reemplaza con el nuevo valor
@@ -324,26 +384,11 @@ Partial Public Class MainWindow : Inherits Window
         File.Delete(NewXmlPath)
     End Sub
 
-    Public Async Sub CopyLauncherShortcutOSXPatch(DestinationFolder As String)
-        Dim resourceName As String = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/LauncherShortcutOSXPatch.zip"
-        Dim resourceStream As Stream = AssetLoader.Open(New Uri(resourceName))
-        Using fileStream As FileStream = File.Create(Path.Combine(DestinationFolder, "LauncherShortcutOSXPatch.zip"))
-            resourceStream.CopyTo(fileStream)
-        End Using
-    End Sub
 
-    Public Async Sub CopyLinuxPatch(DestinationFolder As String)
-        Dim resourceName As String = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/" & UnixPatchName
+    Public Sub CopyEmbeddedAsset(AssetName As String, DestinationFolder As String)
+        Dim resourceName As String = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/" & AssetName
         Dim resourceStream As Stream = AssetLoader.Open(New Uri(resourceName))
-        Using fileStream As FileStream = File.Create(Path.Combine(DestinationFolder, UnixPatchName))
-            resourceStream.CopyTo(fileStream)
-        End Using
-    End Sub
-
-    Public Async Sub CopyLinuxIcon(DestinationFolder As String)
-        Dim resourceName As String = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/HabboCustomLauncherIcon.png"
-        Dim resourceStream As Stream = AssetLoader.Open(New Uri(resourceName))
-        Using fileStream As FileStream = File.Create(Path.Combine(DestinationFolder, "HabboCustomLauncherIcon.png"))
+        Using fileStream As FileStream = File.Create(Path.Combine(DestinationFolder, AssetName))
             resourceStream.CopyTo(fileStream)
         End Using
     End Sub
@@ -414,6 +459,7 @@ Partial Public Class MainWindow : Inherits Window
             CurrentLoginCode = Nothing
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
+            ChangeUpdateSourceButton.IsButtonDisabled = True
             LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeNotDetected(CurrentLanguageInt)
             StartNewInstanceButton.Text = AppTranslator.UnknownClientVersion(CurrentLanguageInt)
             DisplayLauncherVersionOnFooter()
@@ -424,40 +470,83 @@ Partial Public Class MainWindow : Inherits Window
     Public Async Function CleanDeprecatedClients() As Task
         'AGREGAR OPCION PARA HABILITAR/DESHABILITAR LA LIMPIEZA AUTOMATICA DE CLIENTES OBSOLETOS?
         Try
-            StartNewInstanceButton.Text = "Cleaning deprecated clients"
-            Dim JsonRoot As JsonElement = JsonDocument.Parse(Await GetRemoteJsonAsync("https://images.habbo.com/habbo-native-clients/launcher/clientversions.json")).RootElement
-            Dim ValidClientVersions As String() = JsonRoot.GetProperty("win").GetProperty("air").EnumerateArray().Select(Function(x) x.GetString()).ToArray
-            For Each InstalledClientVersion In Directory.GetDirectories(GetPossibleClientPath("")).Select(Function(x) Path.GetFileName(x))
-                If IsNumeric(InstalledClientVersion) AndAlso ValidClientVersions.Contains(InstalledClientVersion) = False Then
-                    Await Task.Run(Sub() Directory.Delete(GetPossibleClientPath(InstalledClientVersion), True))
-                End If
-            Next
+            If UpdateSource = "AIR_Official" Then
+                StartNewInstanceButton.Text = "Cleaning deprecated clients"
+                Dim JsonRoot As JsonElement = JsonDocument.Parse(Await GetRemoteJsonAsync("https://images.habbo.com/habbo-native-clients/launcher/clientversions.json")).RootElement
+                Dim ValidClientVersions As String() = JsonRoot.GetProperty("win").GetProperty("air").EnumerateArray().Select(Function(x) x.GetString()).ToArray
+                For Each InstalledClientVersion In Directory.GetDirectories(GetPossibleClientPath("")).Select(Function(x) Path.GetFileName(x))
+                    If IsNumeric(InstalledClientVersion) AndAlso ValidClientVersions.Contains(InstalledClientVersion) = False Then
+                        Await Task.Run(Sub() Directory.Delete(GetPossibleClientPath(InstalledClientVersion), True))
+                    End If
+                Next
+            End If
         Catch
             'We ignore the error
         End Try
     End Function
 
-    Public Async Function UpdateClientButtonStatus() As Task
+    Public Async Function GetRemoteEtag(url As String) As Task(Of String)
+        HttpClient.DefaultRequestHeaders.Clear()
+        HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36")
+        Dim request As New HttpRequestMessage(HttpMethod.Head, url)
+        Dim response As HttpResponseMessage = Await HttpClient.SendAsync(request)
+        If response.Headers.Contains("ETag") Then
+            Return response.Headers.GetValues("ETag").FirstOrDefault()
+        Else
+            Throw New Exception("ETag not found")
+        End If
+    End Function
+
+    Public Function IsAirPlusEtagMatch(Etag As String) As Boolean
         Try
+            Return File.ReadAllText(Path.Combine(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), "ETag.txt")) = Etag
+        Catch
+            Return False
+        End Try
+    End Function
+
+    Public Async Function UpdateClientButtonStatus() As Task
+        StartNewInstanceButton.IsButtonDisabled = True
+        StartNewInstanceButton2.IsButtonDisabled = True
+        ChangeUpdateSourceButton.IsButtonDisabled = True
+        Try
+            Dim IsClientUpdated As Boolean = False
             StartNewInstanceButton.Text = AppTranslator.ClientUpdatesCheck(CurrentLanguageInt)
-            CurrentClientUrls = New JsonClientUrls(Await GetRemoteJsonAsync("https://" & CurrentLoginCode.ServerUrl & "/gamedata/clienturls"))
-            CleanDeprecatedClients() 'No se si lo ideal seria ponerlo aca o solo en UpdateCliente, lo malo seria que de esa forma si un cliente se actualiza a un server actualiza a una version de cliente ya existe entonces no se eliminaria la version anterior a menos que se vuelva a actualizar.
-            If Directory.Exists(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)) Then 'Abria que verificar swf o mejor aun que exista un archivo READY para asegurarse que se completo todo el proceso de modificaicon
+            If UpdateSource = "AIR_Official" Then
+                CurrentClientUrls = New JsonClientUrls(Await GetRemoteJsonAsync("https://" & CurrentLoginCode.ServerUrl & "/gamedata/clienturls"))
+                IsClientUpdated = Directory.Exists(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)) 'Asumir que el cliente existe y sea valido solo por existir el directorio no es buena practica, habria que cambiarlo por otro metodo
+            End If
+            If UpdateSource = "AIR_Plus" Then
+                CurrentClientUrls = New JsonClientUrls("{'flash-windows-version':'latest','flash-windows':'https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf'}".Replace("'", Chr(34)))
+                Dim AirPlusClientEtag = Await GetRemoteEtag(CurrentClientUrls.FlashWindowsUrl)
+                LatestHabboAirPlusSwfEtag = AirPlusClientEtag
+                IsClientUpdated = IsAirPlusEtagMatch(AirPlusClientEtag)
+            End If
+
+            'Await CleanDeprecatedClients() 'No se si lo ideal seria ponerlo aca o solo en UpdateClient, lo malo seria que de esa forma si un cliente se actualiza a un server actualiza a una version de cliente ya existe entonces no se eliminaria la version anterior a menos que se vuelva a actualizar.
+
+            If IsClientUpdated Then 'Abria que verificar swf o mejor aun que exista un archivo READY para asegurarse que se completo todo el proceso de modificacion
                 StartNewInstanceButton.Text = AppTranslator.LaunchClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
             Else
                 StartNewInstanceButton.Text = AppTranslator.UpdateClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
             End If
+
         Catch
             'StartNewInstanceButton.BackColor = Media.Color.FromRgb(200, 0, 0)
             StartNewInstanceButton.Text = AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt)
         End Try
         StartNewInstanceButton.IsButtonDisabled = False
         StartNewInstanceButton2.IsButtonDisabled = False
+        ChangeUpdateSourceButton.IsButtonDisabled = False
     End Function
 
     Public Function GetPossibleClientPath(ClientVersion As String) As String
         Dim AppDataFolderPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
-        Return Path.Combine(AppDataFolderPath, "Habbo Launcher/downloads/air/" & ClientVersion)
+        Dim ClientType = "air"
+        If UpdateSource = "AIR_Plus" Then
+            ClientType = "airplus"
+        End If
+        Return Path.Combine(AppDataFolderPath, "Habbo Launcher", "downloads", ClientType, ClientVersion)
     End Function
 
     Public Async Function GetRemoteJsonAsync(JsonUrl As String) As Task(Of String)
@@ -521,12 +610,12 @@ Partial Public Class MainWindow : Inherits Window
     Private Sub ChangeUpdateSourceButton_Click(sender As Object, e As EventArgs) Handles ChangeUpdateSourceButton.Click
         Select Case UpdateSource
             Case "AIR_Official"
-                ChangeUpdateSourceButton.Text = AppTranslator.UpdateSourceAirPlus(CurrentLanguageInt)
-            Case "AIR_Plus"
-                ChangeUpdateSourceButton.Text = AppTranslator.UpdateSourceOfficialUnity(CurrentLanguageInt)
+                UpdateSource = "AIR_Plus"
             Case Else
-                ChangeUpdateSourceButton.Text = AppTranslator.UpdateSourceOfficialAir(CurrentLanguageInt)
+                UpdateSource = "AIR_Official"
         End Select
+        RefreshUpdateSourceText()
+        UpdateClientButtonStatus()
     End Sub
 
     Private Sub StartNewInstanceButton2_Click(sender As Object, e As EventArgs) Handles StartNewInstanceButton2.Click
@@ -536,6 +625,7 @@ Partial Public Class MainWindow : Inherits Window
             Directory.Delete(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), True)
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
+            ChangeUpdateSourceButton.IsButtonDisabled = True
             FocusManager.ClearFocus()
             UpdateClientButtonStatus()
         Catch ex As Exception
@@ -743,12 +833,12 @@ Partial Public Class MainWindow : Inherits Window
         ElseIf RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
 
             Dim OSXDownloadFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")
-                CopyLauncherShortcutOSXPatch(OSXDownloadFolder)
+            CopyEmbeddedAsset(LauncherShortcutOSXPatchName, OSXDownloadFolder)
 
-                ZipFile.ExtractToDirectory(Path.Combine(OSXDownloadFolder, "LauncherShortcutOSXPatch.zip"), OSXDownloadFolder)
-                File.Delete(Path.Combine(OSXDownloadFolder, "LauncherShortcutOSXPatch.zip"))
+            ZipFile.ExtractToDirectory(Path.Combine(OSXDownloadFolder, LauncherShortcutOSXPatchName), OSXDownloadFolder, True)
+            File.Delete(Path.Combine(OSXDownloadFolder, LauncherShortcutOSXPatchName))
 
-                Dim scriptPath As String = Path.Combine(OSXDownloadFolder, "HabboCustomLauncherShortcut.sh")
+            Dim scriptPath As String = Path.Combine(OSXDownloadFolder, "HabboCustomLauncherShortcut.sh")
 
                 Dim originalScriptContent = File.ReadAllText(scriptPath, New Text.UTF8Encoding(False))
                 originalScriptContent = originalScriptContent.Replace("%HabboCustomLauncherAppPath%", appPath)
@@ -787,7 +877,7 @@ Partial Public Class MainWindow : Inherits Window
                 MimeType=x-scheme-handler/habbo;".Replace("                ", "")
             Directory.CreateDirectory(IconsPath)
             Directory.CreateDirectory(ShortcutPath)
-            CopyLinuxIcon(IconsPath)
+            CopyEmbeddedAsset("HabboCustomLauncherIcon.png", IconsPath)
             File.WriteAllText(Path.Combine(ShortcutPath, appName & ".desktop"), shortcutContent)
             MakeUnixExecutable(Path.Combine(ShortcutPath, appName & ".desktop"))
         End If
@@ -795,13 +885,13 @@ Partial Public Class MainWindow : Inherits Window
 End Class
 
 Public Class JsonClientUrls
-    Public ReadOnly FlashWindowsVersion As Integer
+    Public ReadOnly FlashWindowsVersion As String
     Public ReadOnly FlashWindowsUrl As String
 
     Public Sub New(JsonString As String)
         'Application.Current.Clipboard.SetTextAsync(JsonString).Wait()
         Dim JsonRoot As JsonElement = JsonDocument.Parse(JsonString).RootElement
-        FlashWindowsVersion = Integer.Parse(JsonRoot.GetProperty("flash-windows-version").GetString())
+        FlashWindowsVersion = JsonRoot.GetProperty("flash-windows-version").GetString()
         FlashWindowsUrl = JsonRoot.GetProperty("flash-windows").GetString()
     End Sub
 End Class
@@ -946,11 +1036,11 @@ Public Class AppTranslator
     }
     Public Shared AddDesktopShortcut As String() = {
         "Add shortcut to desktop",
-        "Añadir acceso directo al escritorio"
+        "AÃ±adir acceso directo al escritorio"
     }
     Public Shared AddStartMenuShortcut As String() = {
         "Add shortcut to start menu",
-        "Añadir acceso directo al menu de inicio"
+        "AÃ±adir acceso directo al menu de inicio"
     }
     Public Shared AutomaticHabboProtocol As String() = {
         "Automatic habbo protocol",

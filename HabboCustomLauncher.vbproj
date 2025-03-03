@@ -15,6 +15,7 @@
     <None Remove="Assets\github-icon.png" />
     <None Remove="Assets\habbo-footer-2.png" />
     <None Remove="Assets\habbo-logo-big-2.png" />
+    <None Remove="Assets\HabboAirPlusPatch.zip" />
     <None Remove="Assets\HabboCustomLauncherIcon.png" />
     <None Remove="Assets\Segoe-UI-Variable-Static-Text.ttf" />
   </ItemGroup>
@@ -26,25 +27,30 @@
     <AvaloniaResource Include="Assets\habbo-footer.png" />
     <AvaloniaResource Include="Assets\habbo-logo-big-2.png" />
     <AvaloniaResource Include="Assets\habbo-logo-big.png" />
+    <AvaloniaResource Include="Assets\HabboAirPlusPatch.zip" />
     <AvaloniaResource Include="Assets\HabboCustomLauncherIcon.png" />
     <AvaloniaResource Include="Assets\modal-backdrop-pink.png" />
     <AvaloniaResource Include="Assets\Segoe-UI-Variable-Static-Text.ttf" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x86' OR '$(Configuration)' == 'Debug'">
+    <AvaloniaResource Include="Assets\HabboAirWindowsPatch_x86.zip" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64' OR '$(Configuration)' == 'Debug'">
     <AvaloniaResource Include="Assets\HabboAirLinuxPatch_x64.zip" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-arm64' OR '$(Configuration)' == 'Debug'">
     <AvaloniaResource Include="Assets\HabboAirLinuxPatch_arm64.zip" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64'">
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64' OR '$(Configuration)' == 'Debug'">
     <AvaloniaResource Include="Assets\HabboAirOSXPatch.zip" />
     <AvaloniaResource Include="Assets\LauncherShortcutOSXPatch.zip" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-arm64'">
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-arm64' OR '$(Configuration)' == 'Debug'">
     <AvaloniaResource Include="Assets\HabboAirOSXPatch.zip" />
     <AvaloniaResource Include="Assets\LauncherShortcutOSXPatch.zip" />
   </ItemGroup>
