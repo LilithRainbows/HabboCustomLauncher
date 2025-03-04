@@ -137,6 +137,8 @@ Partial Public Class MainWindow : Inherits Window
             UnixPatchName = "HabboAirOSXPatch.zip"
         End If
 
+        LoadSavedUpdateSource()
+
         For Each Argument In Environment.GetCommandLineArgs()
             If Argument.StartsWith("habbo://") Then
                 Argument = Argument.Remove(0, Argument.IndexOf("?server=") + 8)
@@ -563,6 +565,26 @@ Partial Public Class MainWindow : Inherits Window
         Return Path.Combine(AppDataFolderPath, "Habbo Launcher", "downloads", ClientType, ClientVersion)
     End Function
 
+    Public Sub SaveCurrentUpdateSource()
+        Dim AppDataFolderPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+        Dim DestinationFolder = Path.Combine(AppDataFolderPath, "Habbo Launcher", "downloads")
+        Directory.CreateDirectory(DestinationFolder)
+        IO.File.WriteAllText(Path.Combine(DestinationFolder, "UpdateSource.txt"), UpdateSource)
+    End Sub
+
+    Public Sub LoadSavedUpdateSource()
+        Dim AppDataFolderPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+        Dim DestinationFile = Path.Combine(AppDataFolderPath, "Habbo Launcher", "downloads", "UpdateSource.txt")
+        If File.Exists(DestinationFile) Then
+            Dim SavedSource = File.ReadAllText(DestinationFile)
+            Dim AllowedSources As String() = {"AIR_Plus", "AIR_Official"}
+            If AllowedSources.Contains(SavedSource) Then
+                UpdateSource = SavedSource
+                RefreshUpdateSourceText()
+            End If
+        End If
+    End Sub
+
     Public Async Function GetRemoteJsonAsync(JsonUrl As String) As Task(Of String)
         HttpClient.DefaultRequestHeaders.Clear()
         HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd(LauncherUserAgent)
@@ -628,6 +650,7 @@ Partial Public Class MainWindow : Inherits Window
             Case Else
                 UpdateSource = "AIR_Official"
         End Select
+        SaveCurrentUpdateSource()
         RefreshUpdateSourceText()
         UpdateClientButtonStatus()
     End Sub
