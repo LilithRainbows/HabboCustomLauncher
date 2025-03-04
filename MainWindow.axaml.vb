@@ -106,7 +106,7 @@ Partial Public Class MainWindow : Inherits Window
     ' Wires up the controls and optionally loads XAML markup and attaches dev tools (if Avalonia.Diagnostics package is referenced)
     Private Sub InitializeComponent(Optional loadXaml As Boolean = True)
         If Globalization.CultureInfo.CurrentCulture.Name.ToLower.StartsWith("es") Then
-            CurrentLanguageInt = 0
+            CurrentLanguageInt = 1
         End If
         If loadXaml Then
             AvaloniaXamlLoader.Load(Me)
