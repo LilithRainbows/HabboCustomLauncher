@@ -35,7 +35,14 @@
             <local:CustomButton IsButtonDisabled="True" x:Name="StartNewInstanceButton" Grid.Column="0" Text="Unknown client version" BackColor="#990084" />
             <local:CustomButton IsButtonDisabled="True" x:Name="StartNewInstanceButton2" Grid.Column="1" Text="X" BackColor="#990084" Margin="5,0,0,0"/>
           </Grid>
-          <local:CustomButton IsButtonDisabled="True" x:Name="ChangeUpdateSourceButton" Grid.Row="2" Text="Current update source: AIR (Official)" BackColor="#990084" Margin="0,0,0,0" Height="40"/>
+          <Grid Grid.Row="2" Margin="0,0,0,10" Height="40">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition />
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <local:CustomButton IsButtonDisabled="True" x:Name="ChangeUpdateSourceButton" Grid.Column="0" Text="Current update source: AIR (Official)" BackColor="#990084" />
+            <local:CustomButton IsButtonDisabled="True" x:Name="ChangeUpdateSourceButton2" Grid.Column="1" Text="?" BackColor="#990084" Margin="5,0,0,0"/>
+          </Grid>
         </Grid>
       </Grid>
       <Grid Grid.Row="2">

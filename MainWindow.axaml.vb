@@ -8,11 +8,13 @@ Imports System.Security.Principal
 Imports System.Text.Json
 Imports System.Threading
 Imports Avalonia.Controls
+Imports Avalonia.Input
 Imports Avalonia.Interactivity
 Imports Avalonia.Markup.Xaml
 Imports Avalonia.Media
 Imports Avalonia.Media.Imaging
 Imports Avalonia.Platform
+Imports Avalonia.Threading
 Imports Microsoft.Win32
 Imports WindowsShortcutFactory
 
@@ -25,6 +27,7 @@ Partial Public Class MainWindow : Inherits Window
     Private WithEvents StartNewInstanceButton2 As CustomButton
     Private WithEvents LoginCodeButton As CustomButton
     Private WithEvents ChangeUpdateSourceButton As CustomButton
+    Private WithEvents ChangeUpdateSourceButton2 As CustomButton
     Private WithEvents HabboLogoButton As Image
     Private WithEvents GithubButton As Image
     Private WithEvents SulakeButton As Image
@@ -103,7 +106,7 @@ Partial Public Class MainWindow : Inherits Window
     ' Wires up the controls and optionally loads XAML markup and attaches dev tools (if Avalonia.Diagnostics package is referenced)
     Private Sub InitializeComponent(Optional loadXaml As Boolean = True)
         If Globalization.CultureInfo.CurrentCulture.Name.ToLower.StartsWith("es") Then
-            CurrentLanguageInt = 1
+            CurrentLanguageInt = 0
         End If
         If loadXaml Then
             AvaloniaXamlLoader.Load(Me)
@@ -114,7 +117,7 @@ Partial Public Class MainWindow : Inherits Window
         StartNewInstanceButton2 = Window.FindNameScope.Find("StartNewInstanceButton2")
         LoginCodeButton = Window.FindNameScope.Find("LoginCodeButton")
         ChangeUpdateSourceButton = Window.FindNameScope.Find("ChangeUpdateSourceButton")
-        ChangeUpdateSourceButton = Window.FindNameScope.Find("ChangeUpdateSourceButton")
+        ChangeUpdateSourceButton2 = Window.FindNameScope.Find("ChangeUpdateSourceButton2")
         HabboLogoButton = Window.FindNameScope.Find("HabboLogoButton")
         GithubButton = Window.FindNameScope.Find("GithubButton")
         SulakeButton = Window.FindNameScope.Find("SulakeButton")
@@ -163,7 +166,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 13 (26/02/2025)"
+        FooterButton.Text = "CustomLauncher version 14 (04/03/2025)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -184,6 +187,7 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
             ChangeUpdateSourceButton.IsButtonDisabled = True
+            ChangeUpdateSourceButton2.IsButtonDisabled = True
             FocusManager.ClearFocus()
             UpdateClientButtonStatus()
         End If
@@ -191,6 +195,7 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
             ChangeUpdateSourceButton.IsButtonDisabled = True
+            ChangeUpdateSourceButton2.IsButtonDisabled = True
             FocusManager.ClearFocus()
             UpdateClient()
         End If
@@ -198,6 +203,7 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
             ChangeUpdateSourceButton.IsButtonDisabled = True
+            ChangeUpdateSourceButton2.IsButtonDisabled = True
             FocusManager.ClearFocus()
             LaunchClient()
         End If
@@ -221,6 +227,7 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton.IsButtonDisabled = False
             StartNewInstanceButton2.IsButtonDisabled = False
             ChangeUpdateSourceButton.IsButtonDisabled = False
+            ChangeUpdateSourceButton2.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.LaunchClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
         End Try
     End Function
@@ -339,12 +346,14 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton.IsButtonDisabled = False
             StartNewInstanceButton2.IsButtonDisabled = False
             ChangeUpdateSourceButton.IsButtonDisabled = False
+            ChangeUpdateSourceButton2.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.LaunchClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
         Catch ex As Exception
             'StartNewInstanceButton.BackColor = Colors.Red
             StartNewInstanceButton.IsButtonDisabled = False
             StartNewInstanceButton2.IsButtonDisabled = False
             ChangeUpdateSourceButton.IsButtonDisabled = False
+            ChangeUpdateSourceButton2.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.UpdateClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
             'Clipboard.SetTextAsync(ex.ToString)
         End Try
@@ -475,6 +484,7 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
             ChangeUpdateSourceButton.IsButtonDisabled = True
+            ChangeUpdateSourceButton2.IsButtonDisabled = True
             LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeNotDetected(CurrentLanguageInt)
             StartNewInstanceButton.Text = AppTranslator.UnknownClientVersion(CurrentLanguageInt)
             DisplayLauncherVersionOnFooter()
@@ -524,6 +534,7 @@ Partial Public Class MainWindow : Inherits Window
         StartNewInstanceButton.IsButtonDisabled = True
         StartNewInstanceButton2.IsButtonDisabled = True
         ChangeUpdateSourceButton.IsButtonDisabled = True
+        ChangeUpdateSourceButton2.IsButtonDisabled = True
         Try
             Dim IsClientUpdated As Boolean = False
             StartNewInstanceButton.Text = AppTranslator.ClientUpdatesCheck(CurrentLanguageInt)
@@ -554,6 +565,7 @@ Partial Public Class MainWindow : Inherits Window
         StartNewInstanceButton.IsButtonDisabled = False
         StartNewInstanceButton2.IsButtonDisabled = False
         ChangeUpdateSourceButton.IsButtonDisabled = False
+        ChangeUpdateSourceButton2.IsButtonDisabled = False
     End Function
 
     Public Function GetPossibleClientPath(ClientVersion As String) As String
@@ -633,13 +645,14 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Private Sub RefreshUpdateSourceText()
+        Dim CurrentUpdateSourceLabel = AppTranslator.CurrentUpdateSource(CurrentLanguageInt)
         Select Case UpdateSource
             Case "AIR_Official"
-                ChangeUpdateSourceButton.Text = AppTranslator.UpdateSourceOfficialAir(CurrentLanguageInt)
+                ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": AIR Classic"
             Case "AIR_Plus"
-                ChangeUpdateSourceButton.Text = AppTranslator.UpdateSourceAirPlus(CurrentLanguageInt)
+                ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": AIR Plus"
             Case Else
-                ChangeUpdateSourceButton.Text = AppTranslator.UpdateSourceOfficialUnity(CurrentLanguageInt)
+                ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": Unknown"
         End Select
     End Sub
 
@@ -663,6 +676,7 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
             ChangeUpdateSourceButton.IsButtonDisabled = True
+            ChangeUpdateSourceButton2.IsButtonDisabled = True
             FocusManager.ClearFocus()
             UpdateClientButtonStatus()
         Catch ex As Exception
@@ -876,22 +890,21 @@ Partial Public Class MainWindow : Inherits Window
             File.Delete(Path.Combine(OSXDownloadFolder, LauncherShortcutOSXPatchName))
 
             Dim scriptPath As String = Path.Combine(OSXDownloadFolder, "HabboCustomLauncherShortcut.sh")
+            Dim originalScriptContent = File.ReadAllText(scriptPath, New Text.UTF8Encoding(False))
+            originalScriptContent = originalScriptContent.Replace("%HabboCustomLauncherAppPath%", appPath)
+            If isDesktop Then
+                originalScriptContent = originalScriptContent.Replace("/Applications/", "$HOME/Desktop/")
+            End If
+            File.WriteAllText(scriptPath, originalScriptContent, New Text.UTF8Encoding(False))
 
-                Dim originalScriptContent = File.ReadAllText(scriptPath, New Text.UTF8Encoding(False))
-                originalScriptContent = originalScriptContent.Replace("%HabboCustomLauncherAppPath%", appPath)
-                If isDesktop Then
-                    originalScriptContent = originalScriptContent.Replace("/Applications/", "$HOME/Desktop/")
-                End If
-                File.WriteAllText(scriptPath, originalScriptContent, New Text.UTF8Encoding(False))
-
-                MakeUnixExecutable(scriptPath)
-                Dim process As New Process()
-                process.StartInfo.FileName = "/bin/bash"
-                process.StartInfo.Arguments = "-c """"" & scriptPath & """"""
-                process.StartInfo.UseShellExecute = False
-                process.StartInfo.CreateNoWindow = True
-                process.Start()
-                process.WaitForExit()
+            MakeUnixExecutable(scriptPath)
+            Dim process As New Process()
+            process.StartInfo.FileName = "/bin/bash"
+            process.StartInfo.Arguments = "-c """"" & scriptPath & """"""
+            process.StartInfo.UseShellExecute = False
+            process.StartInfo.CreateNoWindow = True
+            process.Start()
+            process.WaitForExit()
             File.Delete(Path.Combine(OSXDownloadFolder, "HabboCustomLauncherShortcut.sh"))
 
         Else 'Linux
@@ -919,6 +932,21 @@ Partial Public Class MainWindow : Inherits Window
             MakeUnixExecutable(Path.Combine(ShortcutPath, appName & ".desktop"))
         End If
     End Sub
+
+    Private Sub ChangeUpdateSourceButton2_Click(sender As Object, e As EventArgs) Handles ChangeUpdateSourceButton2.Click
+        Dim contextMenu As New ContextMenu
+        Dim ClientHint As String = "The official classic Habbo client without modifications."
+        If UpdateSource = "AIR_Plus" Then
+            ClientHint = "The classic Habbo client with unofficial modifications."
+        End If
+        contextMenu.Items.Add(New MenuItem With {.Header = ClientHint})
+        If ChangeUpdateSourceButton2.ContextMenu IsNot Nothing Then
+            ChangeUpdateSourceButton2.ContextMenu.Close()
+        End If
+        ChangeUpdateSourceButton2.ContextMenu = contextMenu
+        ChangeUpdateSourceButton2.ContextMenu.Open()
+    End Sub
+
 End Class
 
 Public Class JsonClientUrls
@@ -1035,17 +1063,9 @@ Public Class AppTranslator
         "Unknown client version",
         "Version del cliente desconocida"
     }
-    Public Shared UpdateSourceOfficialAir As String() = {
-        "Current update source: AIR (Official)",
-        "Fuente de actualizaciones: AIR (Oficial)"
-    }
-    Public Shared UpdateSourceAirPlus As String() = {
-        "Current update source: AIR Plus (Unofficial)",
-        "Fuente de actualizaciones: AIR Plus (No oficial)"
-    }
-    Public Shared UpdateSourceOfficialUnity As String() = {
-        "Current update source: Unity (Official)",
-        "Fuente de actualizaciones: Unity (Oficial)"
+    Public Shared CurrentUpdateSource As String() = {
+        "Current update source",
+        "Fuente de actualizaciones"
     }
     Public Shared RetryClientUpdatesCheck As String() = {
         "Retry to check for client updates",
