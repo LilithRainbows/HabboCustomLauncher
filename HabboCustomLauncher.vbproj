@@ -21,6 +21,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="AirSwfDecryptor">
+      <HintPath>Assets\AirSwfDecryptor.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
     <AvaloniaResource Include="Assets\github-icon-2.png" />
     <AvaloniaResource Include="Assets\github-icon.png" />
     <AvaloniaResource Include="Assets\habbo-footer-2.png" />

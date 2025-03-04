@@ -319,6 +319,7 @@ Partial Public Class MainWindow : Inherits Window
             Else
                 Await Task.Run(Sub() ExtractTrimmedOfficialAirClient(ClientFilePath, ClientFolderPath))
                 Await Task.Run(Sub() File.Delete(ClientFilePath))
+                Await Task.Run(Sub() AirSwfDecryptor.FlashCrypto.DecryptFile(Path.Combine(ClientFolderPath, "HabboAir.swf"), Path.Combine(ClientFolderPath, "HabboAir.swf"))) 'The swf is decrypted so that it can later be edited for OSX (the user can also see/edit it)
             End If
 
 
@@ -326,6 +327,9 @@ Partial Public Class MainWindow : Inherits Window
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
                 ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 50) 'OSX is limited to AIR version 50.2.3.8 to provide compatibility with OSX 10.12+, so the swf version will be forced to 50
                 FixOSXClientStructure()
+                MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"))
+            ElseIf RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False Then
+                MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo")) 'Linux
             End If
 
             File.WriteAllText(Path.Combine(ClientFolderPath, "ETag.txt"), LatestClientEtag)
