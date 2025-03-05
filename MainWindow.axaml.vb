@@ -246,6 +246,16 @@ Partial Public Class MainWindow : Inherits Window
         End Try
     End Function
 
+    Sub CodesignDeepForceOSX(filePath As String)
+        Dim process As New Process()
+        process.StartInfo.FileName = "/usr/bin/codesign"
+        process.StartInfo.Arguments = $"--force --deep --sign - ""{filePath}"""
+        process.StartInfo.UseShellExecute = False
+        process.StartInfo.CreateNoWindow = True
+        process.Start()
+        process.WaitForExit()
+    End Sub
+
     Public Sub UnzipIgnoringIOExceptions(sourcezip As String, destinationfolder As String, overwrite As Boolean)
         Using archive As ZipArchive = ZipFile.OpenRead(sourcezip)
             For Each entry As ZipArchiveEntry In archive.Entries
@@ -337,6 +347,7 @@ Partial Public Class MainWindow : Inherits Window
                 ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 50) 'OSX is limited to AIR version 50.2.3.8 to provide compatibility with OSX 10.12+, so the swf version will be forced to 50
                 FixOSXClientStructure()
                 MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"))
+                CodesignDeepForceOSX(Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"))
             ElseIf RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False Then
                 MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo")) 'Linux
             End If
