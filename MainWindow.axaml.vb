@@ -8,13 +8,11 @@ Imports System.Security.Principal
 Imports System.Text.Json
 Imports System.Threading
 Imports Avalonia.Controls
-Imports Avalonia.Input
 Imports Avalonia.Interactivity
 Imports Avalonia.Markup.Xaml
 Imports Avalonia.Media
 Imports Avalonia.Media.Imaging
 Imports Avalonia.Platform
-Imports Avalonia.Threading
 Imports Microsoft.Win32
 Imports WindowsShortcutFactory
 
@@ -166,7 +164,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 14 (04/03/2025)"
+        FooterButton.Text = "CustomLauncher version 15 (05/03/2025)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -579,25 +577,37 @@ Partial Public Class MainWindow : Inherits Window
         ChangeUpdateSourceButton2.IsButtonDisabled = False
     End Function
 
-    Public Function GetPossibleClientPath(ClientVersion As String) As String
+    Public Function GetAppDataPath() As String
         Dim AppDataFolderPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+        If String.IsNullOrWhiteSpace(AppDataFolderPath) Then
+            If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+                AppDataFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config")
+            ElseIf RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
+                AppDataFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "AppData", "Roaming")
+            Else
+                AppDataFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config")
+            End If
+            Directory.CreateDirectory(AppDataFolderPath)
+        End If
+        Return AppDataFolderPath
+    End Function
+
+    Public Function GetPossibleClientPath(ClientVersion As String) As String
         Dim ClientType = "air"
         If UpdateSource = "AIR_Plus" Then
             ClientType = "airplus"
         End If
-        Return Path.Combine(AppDataFolderPath, "Habbo Launcher", "downloads", ClientType, ClientVersion)
+        Return Path.Combine(GetAppDataPath, "Habbo Launcher", "downloads", ClientType, ClientVersion)
     End Function
 
     Public Sub SaveCurrentUpdateSource()
-        Dim AppDataFolderPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
-        Dim DestinationFolder = Path.Combine(AppDataFolderPath, "Habbo Launcher", "downloads")
+        Dim DestinationFolder = Path.Combine(GetAppDataPath, "Habbo Launcher", "downloads")
         Directory.CreateDirectory(DestinationFolder)
         IO.File.WriteAllText(Path.Combine(DestinationFolder, "UpdateSource.txt"), UpdateSource)
     End Sub
 
     Public Sub LoadSavedUpdateSource()
-        Dim AppDataFolderPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
-        Dim DestinationFile = Path.Combine(AppDataFolderPath, "Habbo Launcher", "downloads", "UpdateSource.txt")
+        Dim DestinationFile = Path.Combine(GetAppDataPath, "Habbo Launcher", "downloads", "UpdateSource.txt")
         If File.Exists(DestinationFile) Then
             Dim SavedSource = File.ReadAllText(DestinationFile)
             Dim AllowedSources As String() = {"AIR_Plus", "AIR_Official"}
