@@ -33,7 +33,7 @@ Partial Public Class MainWindow : Inherits Window
     Public CurrentLoginCode As LoginCode
     Public CurrentClientUrls As JsonClientUrls
     Public CurrentDownloadProgress As Integer
-    Public UpdateSource As String = "AIR_Official"
+    Public UpdateSource As String = "AIR_Plus"
     Public CurrentLanguageInt As Integer = 0
     Private ReadOnly HttpClient As New HttpClient()
     Private NamedPipeCancellationTokenSource As CancellationTokenSource
@@ -164,7 +164,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 15 (05/03/2025)"
+        FooterButton.Text = "CustomLauncher version 16 (08/03/2025)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -802,7 +802,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Sub GithubButton_PointerPressed(sender As Object, e As Avalonia.Input.PointerPressedEventArgs) Handles GithubButton.PointerPressed
         Try
-            Process.Start(New ProcessStartInfo("https://github.com/LilithRainbows/HabboCustomLauncherBeta") With {.UseShellExecute = True})
+            Process.Start(New ProcessStartInfo("https://github.com/LilithRainbows/HabboCustomLauncher") With {.UseShellExecute = True})
         Catch
             'Error while launching github url
         End Try
@@ -880,7 +880,7 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Private Sub AddDesktopShortcut()
-        CreateShortcut(Environment.ProcessPath, "HabboCustomLauncherBeta", True)
+        CreateShortcut(Environment.ProcessPath, "HabboCustomLauncher", True)
     End Sub
 
     Private Sub AddStartMenuShortcut()
