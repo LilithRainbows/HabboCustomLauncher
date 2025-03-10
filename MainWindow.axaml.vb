@@ -1,3 +1,4 @@
+Imports System.Globalization
 Imports System.IO
 Imports System.IO.Compression
 Imports System.IO.Pipes
@@ -41,8 +42,7 @@ Partial Public Class MainWindow : Inherits Window
     Public WindowsPatchName As String = "HabboAirWindowsPatch_x86.zip"
     Public AirPlusPatchName As String = "HabboAirPlusPatch.zip"
     Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
-    Public LatestClientEtag As String = ""
-
+    Public AirPlusClientURL = "https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf"
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
 
 
@@ -164,7 +164,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 16 (08/03/2025)"
+        FooterButton.Text = "CustomLauncher version 17 (10/03/2025)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -346,7 +346,14 @@ Partial Public Class MainWindow : Inherits Window
                 MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo")) 'Linux
             End If
 
-            File.WriteAllText(Path.Combine(ClientFolderPath, "ETag.txt"), LatestClientEtag)
+            If UpdateSource = "AIR_Plus" Then
+                Dim AirPlusClientLatestVersion = Await GetRemoteLastModifiedHeaderEpoch(AirPlusClientURL)
+                If CurrentClientUrls.FlashWindowsVersion = AirPlusClientLatestVersion = False Then
+                    Throw New Exception("AirPlus remote client version mismatch") 'Es muy poco probable pero este error ocurre si el identificador de la version remota de airplus cambio desde que se inicio el proceso de descarga
+                End If
+            End If
+
+            File.WriteAllText(Path.Combine(ClientFolderPath, "VERSION.txt"), CurrentClientUrls.FlashWindowsVersion)
 
             StartNewInstanceButton.IsButtonDisabled = False
             StartNewInstanceButton2.IsButtonDisabled = False
@@ -359,7 +366,7 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton2.IsButtonDisabled = False
             ChangeUpdateSourceButton.IsButtonDisabled = False
             ChangeUpdateSourceButton2.IsButtonDisabled = False
-            StartNewInstanceButton.Text = AppTranslator.UpdateClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
+            StartNewInstanceButton.Text = AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt)
             'Clipboard.SetTextAsync(ex.ToString)
         End Try
     End Function
@@ -515,21 +522,28 @@ Partial Public Class MainWindow : Inherits Window
         End Try
     End Function
 
-    Public Async Function GetRemoteEtag(url As String) As Task(Of String)
+    Public Async Function GetRemoteLastModifiedHeaderEpoch(url As String) As Task(Of String)
         HttpClient.DefaultRequestHeaders.Clear()
         HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36")
         Dim request As New HttpRequestMessage(HttpMethod.Head, url)
         Dim response As HttpResponseMessage = Await HttpClient.SendAsync(request)
-        If response.Headers.Contains("ETag") Then
-            Return response.Headers.GetValues("ETag").FirstOrDefault()
+        If response.Headers.Contains("x-ms-creation-time") Then
+            Dim lastmodified = response.Headers.GetValues("x-ms-creation-time").FirstOrDefault()
+            Dim dateTimeUtc As DateTime = DateTime.ParseExact(lastmodified, "ddd, dd MMM yyyy HH:mm:ss 'GMT'", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal)
+            Dim epochTime As Long = CType((dateTimeUtc - New DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds, Long)
+            Return epochTime.ToString()
         Else
-            Throw New Exception("ETag not found")
+            Throw New Exception("Last modified header not found")
         End If
     End Function
 
-    Public Function IsClientEtagMatch(Etag As String) As Boolean
+    Public Function IsClientVersionExists(Optional ClientVersion As String = "") As Boolean
         Try
-            Return File.ReadAllText(Path.Combine(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), "ETag.txt")) = Etag
+            If String.IsNullOrWhiteSpace(ClientVersion) Then
+                ClientVersion = CurrentClientUrls.FlashWindowsVersion
+            End If
+            Dim ClientPath = GetPossibleClientPath(ClientVersion)
+            Return Directory.Exists(ClientPath) AndAlso File.Exists(Path.Combine(ClientPath, "VERSION.txt"))
         Catch
             Return False
         End Try
@@ -545,16 +559,13 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton.Text = AppTranslator.ClientUpdatesCheck(CurrentLanguageInt)
             If UpdateSource = "AIR_Official" Then
                 CurrentClientUrls = New JsonClientUrls(Await GetRemoteJsonAsync("https://" & CurrentLoginCode.ServerUrl & "/gamedata/clienturls"))
-                LatestClientEtag = "a_complete_unknown"
-                IsClientUpdated = Directory.Exists(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)) AndAlso IO.File.Exists(Path.Combine(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), "ETag.txt"))
             End If
             If UpdateSource = "AIR_Plus" Then
-                CurrentClientUrls = New JsonClientUrls("{'flash-windows-version':'latest','flash-windows':'https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf'}".Replace("'", Chr(34)))
-                Dim AirPlusClientEtag = Await GetRemoteEtag(CurrentClientUrls.FlashWindowsUrl)
-                LatestClientEtag = AirPlusClientEtag
-                IsClientUpdated = IsClientEtagMatch(AirPlusClientEtag)
+                Dim AirPlusClientLatestVersion = Await GetRemoteLastModifiedHeaderEpoch(AirPlusClientURL)
+                CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & AirPlusClientLatestVersion & "','flash-windows':'" & AirPlusClientURL & "'}").Replace("'", Chr(34)))
             End If
 
+            IsClientUpdated = IsClientVersionExists()
             'Await CleanDeprecatedClients() 'No se si lo ideal seria ponerlo aca o solo en UpdateClient, lo malo seria que de esa forma si un cliente se actualiza a un server actualiza a una version de cliente ya existe entonces no se eliminaria la version anterior a menos que se vuelva a actualizar.
 
             If IsClientUpdated Then 'Abria que verificar swf o mejor aun que exista un archivo READY para asegurarse que se completo todo el proceso de modificacion
