@@ -231,17 +231,13 @@ Partial Public Class MainWindow : Inherits Window
     End Function
 
     Function MakeUnixExecutable(ByVal filePath As String) As Boolean
-        Try
-            ' Permisos: -rwxr--r--
-            Dim executablePermissions As UnixFileMode = UnixFileMode.UserRead Or UnixFileMode.UserWrite Or UnixFileMode.UserExecute Or
-                                                        UnixFileMode.GroupRead Or
-                                                        UnixFileMode.OtherRead
-            File.SetUnixFileMode(filePath, executablePermissions)
-            Return True ' Exito
-        Catch ex As Exception
-            Console.WriteLine($"Error while making executable: {ex.Message}")
-            Return False ' Fallo
-        End Try
+        Dim process As New Process()
+        process.StartInfo.FileName = "chmod"
+        process.StartInfo.Arguments = $"+x ""{filePath}"""
+        process.StartInfo.UseShellExecute = False
+        process.StartInfo.CreateNoWindow = True
+        process.Start()
+        process.WaitForExit()
     End Function
 
     Sub CodesignDeepForceOSX(filePath As String)
