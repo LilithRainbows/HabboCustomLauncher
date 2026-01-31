@@ -950,7 +950,7 @@ Partial Public Class MainWindow : Inherits Window
                 Name={appName}
                 Exec=""{appPath}"" %U
                 Terminal=false
-                Icon=HabboCustomLauncherIcon.png
+                Icon={Path.Combine(IconsPath, "HabboCustomLauncherIcon.png")}
                 Categories=Game;
                 MimeType=x-scheme-handler/habbo;".Replace("                ", "")
             Directory.CreateDirectory(IconsPath)
@@ -1131,4 +1131,5 @@ Public Class AppTranslator
         "Automatic habbo protocol",
         "Habbo protocol automatico"
     }
+
 End Class
