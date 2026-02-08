@@ -18,10 +18,9 @@ Module Program
             appMutex = New Mutex(True, mutexName, isNewInstance)
             If Not isNewInstance Then
                 For Each Argument In Environment.GetCommandLineArgs()
-                    If Argument.StartsWith("habbo://") Then
-                        Argument = Argument.Remove(0, Argument.IndexOf("?server=") + 8)
-                        Argument = Argument.Replace("&token=", ".")
-                        SendLoginTicketToMainInstance(Argument)
+                    Dim LoginCode As String = ""
+                    If TryConvertHabboProtocolToLoginCode(Argument, LoginCode) Then
+                        SendLoginTicketToMainInstance(LoginCode)
                         Return
                     End If
                 Next
@@ -80,6 +79,52 @@ Module Program
             .LogToTrace() _
             .With(FontOptions) _
             .WithSystemFontSource(New Uri(FontFamilyName, UriKind.Absolute))
+    End Function
+
+    Public Function TryConvertHabboProtocolToLoginCode(rawArgument As String, ByRef loginCode As String) As Boolean
+        loginCode = ""
+        If String.IsNullOrWhiteSpace(rawArgument) Then
+            Return False
+        End If
+
+        Dim trimmedArgument = rawArgument.Trim().Trim("\"""c, "'"c)
+        If trimmedArgument.StartsWith("habbo://", StringComparison.OrdinalIgnoreCase) = False Then
+            Return False
+        End If
+
+        Dim query As String = ""
+        Dim queryIndex As Integer = trimmedArgument.IndexOf("?"c)
+        If queryIndex >= 0 AndAlso queryIndex < trimmedArgument.Length - 1 Then
+            query = trimmedArgument.Substring(queryIndex + 1)
+        End If
+
+        If String.IsNullOrWhiteSpace(query) Then
+            Return False
+        End If
+
+        Dim server As String = ""
+        Dim token As String = ""
+        For Each part In query.Split("&"c)
+            Dim keyValue = part.Split("="c, 2)
+            If keyValue.Length <> 2 Then
+                Continue For
+            End If
+            Dim key = keyValue(0).Trim().ToLowerInvariant()
+            Dim value = Uri.UnescapeDataString(keyValue(1).Trim())
+
+            If key = "server" Then
+                server = value
+            ElseIf key = "token" Then
+                token = value
+            End If
+        Next
+
+        If String.IsNullOrWhiteSpace(server) Or String.IsNullOrWhiteSpace(token) Then
+            Return False
+        End If
+
+        loginCode = server & "." & token
+        Return True
     End Function
 
 End Module
