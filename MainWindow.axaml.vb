@@ -141,10 +141,9 @@ Partial Public Class MainWindow : Inherits Window
         LoadSavedUpdateSource()
 
         For Each Argument In Environment.GetCommandLineArgs()
-            If Argument.StartsWith("habbo://") Then
-                Argument = Argument.Remove(0, Argument.IndexOf("?server=") + 8)
-                Argument = Argument.Replace("&token=", ".")
-                CopyToClipboard(Argument) 'Clipboard.SetTextAsync(Argument).Wait()
+            Dim LoginCode As String = ""
+            If TryConvertHabboProtocolToLoginCode(Argument, LoginCode) Then
+                CopyToClipboard(LoginCode) 'Clipboard.SetTextAsync(Argument).Wait()
                 CheckClipboardLoginCodeAsync()
             End If
         Next
