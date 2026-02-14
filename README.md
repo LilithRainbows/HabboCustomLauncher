@@ -1,4 +1,6 @@
 # HabboCustomLauncher
+### WARNING: <br> The project is temporarily outdated, but it will be back soon!
+
 <img width="482" alt="image" src="https://github.com/user-attachments/assets/bdab6a02-86f5-4f39-8c87-48ce75ecca06" />
 <br><br>
 
