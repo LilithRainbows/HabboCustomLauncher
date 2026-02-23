@@ -11,6 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\DollChair.png" />
     <None Remove="Assets\github-icon-2.png" />
     <None Remove="Assets\github-icon.png" />
     <None Remove="Assets\habbo-footer-2.png" />
@@ -27,6 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AvaloniaResource Include="Assets\DollChair.png" />
     <AvaloniaResource Include="Assets\github-icon-2.png" />
     <AvaloniaResource Include="Assets\github-icon.png" />
     <AvaloniaResource Include="Assets\habbo-footer-2.png" />

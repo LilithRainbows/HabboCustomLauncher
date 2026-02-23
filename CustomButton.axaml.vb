@@ -62,6 +62,21 @@ Partial Public Class CustomButton : Inherits UserControl
         End Set
     End Property
 
+    Public Shared ReadOnly IsFocusableProperty As AvaloniaProperty(Of Boolean) =
+        AvaloniaProperty.Register(Of CustomButton, Boolean)(NameOf(IsFocusable))
+
+    Public Property IsFocusable As Boolean
+        Get
+            Return GetValue(IsFocusableProperty)
+        End Get
+        Set
+            SetValue(IsFocusableProperty, Value)
+            If Value = False Then
+                InnerButton.Focusable = False
+            End If
+        End Set
+    End Property
+
     Public Shared ReadOnly IsButtonCorneredProperty As AvaloniaProperty(Of Boolean) =
         AvaloniaProperty.Register(Of CustomButton, Boolean)(NameOf(IsButtonCornered))
 

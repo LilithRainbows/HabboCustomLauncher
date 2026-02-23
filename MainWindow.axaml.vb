@@ -6,14 +6,17 @@ Imports System.Net.Http
 Imports System.Reflection
 Imports System.Runtime.InteropServices
 Imports System.Security.Principal
+Imports System.Text
 Imports System.Text.Json
 Imports System.Threading
+Imports Avalonia
 Imports Avalonia.Controls
 Imports Avalonia.Interactivity
 Imports Avalonia.Markup.Xaml
 Imports Avalonia.Media
 Imports Avalonia.Media.Imaging
 Imports Avalonia.Platform
+Imports Avalonia.VisualTree
 Imports Microsoft.Win32
 Imports WindowsShortcutFactory
 
@@ -21,8 +24,12 @@ Imports WindowsShortcutFactory
 'SOLUCION: Al hacer click al boton se pregunta para introducir manualmente el codigo (aunque seria innecesario), mejor preguntar que hotel lanzar directamente? o tambien es innecesario? si todo es innecesario capaz convenga hacer que deje de ser un boton y pase a ser un label
 
 Partial Public Class MainWindow : Inherits Window
+    Private WithEvents LoadingWindowChild As LoadingWindow
+    Private LoadingWindowClientLaunchRequested As Boolean = False
     Private WithEvents Window As Window
-    Private WithEvents StartNewInstanceButton As CustomButton
+    Private WithEvents TitleBarLabel As Label
+    Private WithEvents CloseButton As CustomButton
+    Public WithEvents StartNewInstanceButton As CustomButton
     Private WithEvents StartNewInstanceButton2 As CustomButton
     Private WithEvents LoginCodeButton As CustomButton
     Private WithEvents ChangeUpdateSourceButton As CustomButton
@@ -111,6 +118,8 @@ Partial Public Class MainWindow : Inherits Window
         End If
         'Example: Control = FindNameScope().Find("Control_Name")
         Window = FindNameScope().Find("Window")
+        TitleBarLabel = Window.FindNameScope.Find("TitleBarLabel")
+        CloseButton = FindNameScope().Find("CloseButton")
         StartNewInstanceButton = Window.FindNameScope.Find("StartNewInstanceButton")
         StartNewInstanceButton2 = Window.FindNameScope.Find("StartNewInstanceButton2")
         LoginCodeButton = Window.FindNameScope.Find("LoginCodeButton")
@@ -142,6 +151,18 @@ Partial Public Class MainWindow : Inherits Window
 
         For Each Argument In Environment.GetCommandLineArgs()
             If Argument.StartsWith("habbo://") Then
+
+                Dim umaka As New LoadingWindow()
+                LoadingWindowChild = umaka
+                LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt)
+                Window.IsEnabled = False
+                Window.ShowInTaskbar = False
+                Window.Opacity = 0
+                umaka.Show()
+                umaka.BringIntoView()
+                umaka.Focus()
+                umaka.Activate()
+
                 Argument = Argument.Remove(0, Argument.IndexOf("?server=") + 8)
                 Argument = Argument.Replace("&token=", ".")
                 CopyToClipboard(Argument) 'Clipboard.SetTextAsync(Argument).Wait()
@@ -164,7 +185,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 17 (10/03/2025)"
+        FooterButton.Text = "CustomLauncher version 18 (23/02/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -299,6 +320,15 @@ Partial Public Class MainWindow : Inherits Window
         File.WriteAllBytes(rutaArchivo, datos)
     End Sub
 
+    Function GetSwfType(SwfPath As String) As String
+        Using br As New BinaryReader(File.OpenRead(SwfPath))
+            br.BaseStream.Seek(0, SeekOrigin.Begin)
+            Return Encoding.UTF8.GetString(br.ReadBytes(4))
+        End Using
+        Throw New Exception("GetSwfType failed!")
+    End Function
+
+
     Public Async Function UpdateClient() As Task
         Try
             Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
@@ -332,7 +362,10 @@ Partial Public Class MainWindow : Inherits Window
             Else
                 Await Task.Run(Sub() ExtractTrimmedOfficialAirClient(ClientFilePath, ClientFolderPath))
                 Await Task.Run(Sub() File.Delete(ClientFilePath))
-                Await Task.Run(Sub() AirSwfDecryptor.FlashCrypto.DecryptFile(Path.Combine(ClientFolderPath, "HabboAir.swf"), Path.Combine(ClientFolderPath, "HabboAir.swf"))) 'The swf is decrypted so that it can later be edited for OSX (the user can also see/edit it)
+                Dim ClientSwfType = GetSwfType(Path.Combine(ClientFolderPath, "HabboAir.swf"))
+                If ClientSwfType.StartsWith("cWS") Or ClientSwfType.StartsWith("fWS") Or ClientSwfType.StartsWith("zWS") Then
+                    Await Task.Run(Sub() AirSwfDecryptor.FlashCrypto.DecryptFile(Path.Combine(ClientFolderPath, "HabboAir.swf"), Path.Combine(ClientFolderPath, "HabboAir.swf"))) 'The swf is decrypted (if needed) so that it can later be edited for OSX (the user can also see/edit it)
+                End If
             End If
 
 
@@ -405,21 +438,30 @@ Partial Public Class MainWindow : Inherits Window
         Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
         Dim OriginalXmlPath As String = Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")
         Dim OriginalXmlVersionNumber As String
+        Dim OriginalXmlExtensionsNode As XElement
         Dim NewXmlPath As String = Path.Combine(ClientFolderPath, "application.xml")
         Dim xmlDoc As New XDocument()
-        If UpdateSource = "AIR_Plus" Then
-            OriginalXmlVersionNumber = "1.0"
-        Else
+        If IO.File.Exists(OriginalXmlPath) Then
             xmlDoc = XDocument.Load(OriginalXmlPath)
             OriginalXmlVersionNumber = xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "versionLabel")
+            OriginalXmlExtensionsNode = xmlDoc.Root.Elements().FirstOrDefault(Function(x) x.Name.LocalName = "extensions")
+        Else
+            OriginalXmlVersionNumber = "1.0"
+            OriginalXmlExtensionsNode = Nothing
+        End If
+        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False Then
+            OriginalXmlExtensionsNode = Nothing 'In the future, AIR extensions support for OSX (and perhaps Linux, if possible) should be added.
         End If
         xmlDoc = XDocument.Load(NewXmlPath)
         xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "versionLabel").Value = OriginalXmlVersionNumber ' Reemplaza con el nuevo valor
         xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "versionNumber").Value = OriginalXmlVersionNumber ' Reemplaza con el nuevo valor
+        If OriginalXmlExtensionsNode IsNot Nothing Then
+            Dim NewXmlNamespace As XNamespace = xmlDoc.Root.Name.Namespace
+            xmlDoc.Root.Add(New XElement(NewXmlNamespace + OriginalXmlExtensionsNode.Name.LocalName, OriginalXmlExtensionsNode.Elements().Select(Function(e) New XElement(NewXmlNamespace + e.Name.LocalName, e.Value))))
+        End If
         xmlDoc.Save(OriginalXmlPath)
         File.Delete(NewXmlPath)
     End Sub
-
 
     Public Sub CopyEmbeddedAsset(AssetName As String, DestinationFolder As String)
         Dim resourceName As String = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/" & AssetName
@@ -975,6 +1017,55 @@ Partial Public Class MainWindow : Inherits Window
         ChangeUpdateSourceButton2.ContextMenu.Open()
     End Sub
 
+    Private Sub TitleBarLabel_PointerPressed(sender As Object, e As Input.PointerPressedEventArgs) Handles TitleBarLabel.PointerPressed
+        ' Solo con botón izquierdo
+        If e.GetCurrentPoint(TitleBarLabel).Properties.IsLeftButtonPressed Then
+            ' Avalonia se encarga de DPI y límites automáticamente
+            Me.BeginMoveDrag(e)
+        End If
+    End Sub
+
+    Private Sub CloseButton_Click(sender As Object, e As EventArgs) Handles CloseButton.Click
+        Window.Close()
+    End Sub
+
+    Private Sub StartNewInstanceButton_PropertyChanged(sender As Object, e As AvaloniaPropertyChangedEventArgs) Handles StartNewInstanceButton.PropertyChanged
+        If e.Property.Name = "Text" Then
+            If LoadingWindowChild IsNot Nothing Then
+                If StartNewInstanceButton.Text.StartsWith(AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt)) Then 'Update fail
+                    LoadingWindowChild.Close()
+                    LoadingWindowChild = Nothing
+                    Window.IsEnabled = True
+                    Window.ShowInTaskbar = True
+                    Window.Opacity = 1
+                    Window.Show()
+                    Window.BringIntoView()
+                    Window.Focus()
+                    Window.Activate()
+                    Return
+                End If
+                If StartNewInstanceButton.Text.StartsWith(AppTranslator.LaunchClientVersion(CurrentLanguageInt)) Then 'Launch client
+                    LoadingWindowClientLaunchRequested = True
+                    StartNewInstanceButton_Click(Nothing, Nothing)
+                    Return
+                End If
+                If StartNewInstanceButton.Text.StartsWith(AppTranslator.UnknownClientVersion(CurrentLanguageInt)) AndAlso LoadingWindowClientLaunchRequested = True Then 'Client launched
+                    LoadingWindowClientLaunchRequested = False
+                    Process.GetCurrentProcess.Kill()
+                    Return
+                End If
+                If StartNewInstanceButton.Text.StartsWith(AppTranslator.UpdateClientVersion(CurrentLanguageInt)) Then 'Update client
+                    StartNewInstanceButton_Click(Nothing, Nothing)
+                    Return
+                End If
+                If StartNewInstanceButton.Text.StartsWith(AppTranslator.DownloadingClient(CurrentLanguageInt)) Or StartNewInstanceButton.Text.StartsWith(AppTranslator.ExtractingClient(CurrentLanguageInt)) Then 'Client downloading or extracting
+                    LoadingWindowChild.StatusLabel.Text = e.NewValue
+                Else
+                    LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) 'Generic loading
+                End If
+            End If
+        End If
+    End Sub
 End Class
 
 Public Class JsonClientUrls
@@ -1067,6 +1158,10 @@ End Class
 
 Public Class AppTranslator
     '0=English 1=Spanish
+    Public Shared GenericLoading As String() = {
+        "Loading ...",
+        "Cargando ..."
+    }
     Public Shared DownloadingClient As String() = {
         "Downloading client",
         "Descargando cliente"

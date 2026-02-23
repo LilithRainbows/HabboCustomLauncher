@@ -4,6 +4,7 @@ Imports System.Reflection
 Imports System.Runtime.InteropServices
 Imports System.Threading
 Imports Avalonia
+Imports Avalonia.Controls
 Imports Avalonia.Media
 
 
@@ -28,17 +29,7 @@ Module Program
                 SendLoginTicketToMainInstance("main")
                 Return
             End If
-
-            Dim AvaloniaApp = BuildAvaloniaApp()
-            Dim osVersion = Environment.OSVersion.Version
-            If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) AndAlso osVersion.Major = 6 AndAlso osVersion.Minor = 1 Then 'Usando Windows 7 se define renderizado por software debido a que el usuario probablemente tenga una gpu demasiado antigua para soportar opengl de forma adecuada (gma3600 por ejemplo da problemas)
-                Dim Win32Options As New Win32PlatformOptions With {
-                    .RenderingMode = {Win32RenderingMode.Software},
-                    .CompositionMode = {Win32CompositionMode.RedirectionSurface}
-                    }
-                AvaloniaApp.With(Win32Options)
-            End If
-            AvaloniaApp.StartWithClassicDesktopLifetime(args)
+            StartAvaloniaApp(Function() New MainWindow(), args)
         Catch
             'App startup error
         End Try
@@ -48,6 +39,19 @@ Module Program
             'Error while releasing mutex
         End Try
         Environment.Exit(0)
+    End Sub
+
+    Private Sub StartAvaloniaApp(NewWindow As Func(Of Window), NewWindowArgs As String())
+        Dim AvaloniaApp = BuildAvaloniaApp()
+        Dim osVersion = Environment.OSVersion.Version
+        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) AndAlso osVersion.Major = 6 AndAlso osVersion.Minor = 1 Then 'Usando Windows 7 se define renderizado por software debido a que el usuario probablemente tenga una gpu demasiado antigua para soportar opengl de forma adecuada (gma3600 por ejemplo da problemas)
+            Dim Win32Options As New Win32PlatformOptions With {
+                .RenderingMode = {Win32RenderingMode.Software},
+                .CompositionMode = {Win32CompositionMode.RedirectionSurface}
+                }
+            AvaloniaApp.With(Win32Options)
+        End If
+        AvaloniaApp.Start(Sub(app As Application, args As String()) app.Run(NewWindow()), NewWindowArgs)
     End Sub
 
     Private Sub SendLoginTicketToMainInstance(LoginTicket As String)
