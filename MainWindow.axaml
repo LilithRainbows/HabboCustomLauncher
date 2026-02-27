@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:HabboCustomLauncher"
         x:Name="Window"
-        mc:Ignorable="d" Width="640" Height="512" CanResize="False" SystemDecorations="BorderOnly" Opacity="1"
+        mc:Ignorable="d" Width="642" Height="513" CanResize="False" SystemDecorations="BorderOnly" Opacity="1"
         Title="HabboCustomLauncher"
         WindowStartupLocation="CenterScreen" Background="Black" FontFamily="{StaticResource NewSegoeUI}" Icon="/Assets/HabboCustomLauncherIcon.ico">
 	<Grid>
@@ -15,50 +15,52 @@
 		</Grid.RowDefinitions>
 		<Label Name="TitleBarLabel" Grid.Row="0" Background="#A22A60" Foreground="White" Content="    HabboCustomLauncher" VerticalContentAlignment="Center"/>
 		<local:CustomButton x:Name="CloseButton" IsFocusable="False" Grid.Row="0" Foreground="White" HorizontalAlignment="Right" Text="   X   " BackColor="#78FF0000"/>
-		<Grid Grid.Row="1">
-			<Image Source="/Assets/modal-backdrop-pink.png"/>
-			<Grid>
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto"/>
-					<RowDefinition/>
-					<RowDefinition Height="Auto"/>
-				</Grid.RowDefinitions>
-				<Grid Grid.Row="0">
-					<Image x:Name="HabboLogoButton" Source="/Assets/habbo-logo-big.png" Stretch="None" Margin="20,20,20,0" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-				</Grid>
-				<Grid Grid.Row="1" Margin="100,0,100,0" VerticalAlignment="Center">
-					<Grid>
-						<Grid.RowDefinitions>
-							<RowDefinition Height="Auto"/>
-							<RowDefinition Height="Auto"/>
-							<RowDefinition Height="Auto"/>
-						</Grid.RowDefinitions>
-						<local:CustomButton x:Name="LoginCodeButton" Grid.Row="0" Text="Clipboard login code not detected" BackColor="#3F3F3F" Margin="0,0,0,10" Height="40" IsButtonCornered="False"/>
-						<Grid Grid.Row="1" Margin="0,0,0,10" Height="40">
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition />
-								<ColumnDefinition Width="Auto"/>
-							</Grid.ColumnDefinitions>
-							<local:CustomButton IsButtonDisabled="True" x:Name="StartNewInstanceButton" Grid.Column="0" Text="Unknown client version" BackColor="#990084" />
-							<local:CustomButton IsButtonDisabled="True" x:Name="StartNewInstanceButton2" Grid.Column="1" Text="X" BackColor="#990084" Margin="5,0,0,0"/>
-						</Grid>
-						<Grid Grid.Row="2" Margin="0,0,0,10" Height="40">
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition />
-								<ColumnDefinition Width="Auto"/>
-							</Grid.ColumnDefinitions>
-							<local:CustomButton IsButtonDisabled="True" x:Name="ChangeUpdateSourceButton" Grid.Column="0" Text="Current update source: AIR (Official)" BackColor="#990084" />
-							<local:CustomButton IsButtonDisabled="True" x:Name="ChangeUpdateSourceButton2" Grid.Column="1" Text="?" BackColor="#990084" Margin="5,0,0,0"/>
+		<Border Grid.Row="1" BorderThickness="1,0,1,1" BorderBrush="#A22A60">
+			<Grid Grid.Row="0">
+				<Image Source="/Assets/modal-backdrop-pink.png"/>
+				<Grid>
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition/>
+						<RowDefinition Height="Auto"/>
+					</Grid.RowDefinitions>
+					<Grid Grid.Row="0">
+						<Image x:Name="HabboLogoButton" Source="/Assets/habbo-logo-big.png" Stretch="None" Margin="20,20,20,0" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+					</Grid>
+					<Grid Grid.Row="1" Margin="100,0,100,0" VerticalAlignment="Center">
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="Auto"/>
+							</Grid.RowDefinitions>
+							<local:CustomButton x:Name="LoginCodeButton" Grid.Row="0" Text="Clipboard login code not detected" BackColor="#3F3F3F" Margin="0,0,0,10" Height="40" IsButtonCornered="False"/>
+							<Grid Grid.Row="1" Margin="0,0,0,10" Height="40">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition />
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<local:CustomButton IsButtonDisabled="True" x:Name="StartNewInstanceButton" Grid.Column="0" Text="Unknown client version" BackColor="#990084" />
+								<local:CustomButton IsButtonDisabled="True" x:Name="StartNewInstanceButton2" Grid.Column="1" Width="30" Text="X" BackColor="#990084" Margin="5,0,0,0"/>
+							</Grid>
+							<Grid Grid.Row="2" Margin="0,0,0,10" Height="40">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition />
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<local:CustomButton IsButtonDisabled="True" x:Name="ChangeUpdateSourceButton" Grid.Column="0" Text="Current update source: AIR (Official)" BackColor="#990084" />
+								<local:CustomButton IsButtonDisabled="True" x:Name="ChangeUpdateSourceButton2" Grid.Column="1" Width="30" Text="?" BackColor="#990084" Margin="5,0,0,0"/>
+							</Grid>
 						</Grid>
 					</Grid>
-				</Grid>
-				<Grid Grid.Row="2">
-					<Grid Background="Black" Opacity="0.5"/>
-					<local:CustomButton IsButtonDisabled="False" x:Name="FooterButton" Text="Unknown CustomLauncher version" BackColor="Transparent" Opacity="0.8" HorizontalAlignment="Center" VerticalAlignment="Center" Height="40" Margin="0,0,13,0"/>
-					<Image Name="GithubButton" Source="/Assets/github-icon.png" Stretch="None" Margin="15,10,0,10" HorizontalAlignment="Left"/>
-					<Image Name="SulakeButton" Source="/Assets/habbo-footer.png" Stretch="None" Margin="0,10,15,10" HorizontalAlignment="Right"/>
+					<Grid Grid.Row="2">
+						<Grid Background="Black" Opacity="0.5"/>
+						<local:CustomButton IsButtonDisabled="False" x:Name="FooterButton" Text="Unknown CustomLauncher version" BackColor="Transparent" Opacity="0.8" HorizontalAlignment="Center" VerticalAlignment="Center" Height="40" Margin="0,0,13,0"/>
+						<Image Name="GithubButton" Source="/Assets/github-icon.png" Stretch="None" Margin="15,10,0,10" HorizontalAlignment="Left"/>
+						<Image Name="SulakeButton" Source="/Assets/habbo-footer.png" Stretch="None" Margin="0,10,15,10" HorizontalAlignment="Right"/>
+					</Grid>
 				</Grid>
 			</Grid>
-		</Grid>
+		</Border>
 	</Grid>
 </Window>

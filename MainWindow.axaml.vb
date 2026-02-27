@@ -11,6 +11,7 @@ Imports System.Text.Json
 Imports System.Threading
 Imports Avalonia
 Imports Avalonia.Controls
+Imports Avalonia.Input.Platform
 Imports Avalonia.Interactivity
 Imports Avalonia.Markup.Xaml
 Imports Avalonia.Media
@@ -51,7 +52,7 @@ Partial Public Class MainWindow : Inherits Window
     Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
     Public AirPlusClientURL = "https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf"
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
-
+    Public Shared LoadingWindowCloseRequested As Boolean = False 'If LoadingWindow.close() is invoked while this variable is false, then MainWindow.close() will be invoked
 
     Public Async Sub StartPipedLoginTicketListener()
         Try
@@ -63,19 +64,9 @@ Partial Public Class MainWindow : Inherits Window
                         Using reader As New StreamReader(pipeServer)
                             Dim arguments As String = Await reader.ReadLineAsync()
                             If arguments IsNot Nothing Then
-
-                                If Window.IsActive = False Then
-                                    Window.WindowState = WindowState.Minimized
-                                    Await Task.Delay(100)
-                                    Window.WindowState = WindowState.Normal
-                                    Window.Activate()
+                                If Window.IsActive = False And LoadingWindowChild Is Nothing Then
+                                    Await EnsureWindowFocus(Window)
                                 End If
-
-                                'Window.Topmost = True
-                                'Window.WindowState = WindowState.Normal
-                                'Window.Activate()
-                                'Window.Topmost = False
-
                                 If arguments = "main" = False Then
                                     Await Clipboard.SetTextAsync(arguments)
                                     Await CheckClipboardLoginCodeAsync()
@@ -152,16 +143,13 @@ Partial Public Class MainWindow : Inherits Window
         For Each Argument In Environment.GetCommandLineArgs()
             If Argument.StartsWith("habbo://") Then
 
-                Dim umaka As New LoadingWindow()
-                LoadingWindowChild = umaka
-                LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt)
-                Window.IsEnabled = False
-                Window.ShowInTaskbar = False
-                Window.Opacity = 0
-                umaka.Show()
-                umaka.BringIntoView()
-                umaka.Focus()
-                umaka.Activate()
+                LoadingWindowCloseRequested = False
+                LoadingWindowChild = New LoadingWindow()
+                LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) & " ..." 'Generic loading
+
+                ToggleWindowVisibility(Window, False)
+
+                EnsureWindowFocus(LoadingWindowChild)
 
                 Argument = Argument.Remove(0, Argument.IndexOf("?server=") + 8)
                 Argument = Argument.Replace("&token=", ".")
@@ -185,7 +173,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 18 (23/02/2026)"
+        FooterButton.Text = "CustomLauncher version 19 (27/02/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -513,20 +501,9 @@ Partial Public Class MainWindow : Inherits Window
                 CurrentLoginCode = ClipboardLoginCode
                 LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeDetected(CurrentLanguageInt) & " [" & ClipboardLoginCode.ServerId.Replace("hh", "").ToUpper & "]"
                 If OldLoginTicket = ClipboardLoginCode.SSOTicket = False Then
-
-
-                    If Window.IsActive = False Then
-                        Window.WindowState = WindowState.Minimized
-                        Await Task.Delay(100)
-                        Window.WindowState = WindowState.Normal
-                        Window.Activate()
+                    If Window.IsActive = False And LoadingWindowChild Is Nothing Then
+                        Await EnsureWindowFocus(Window)
                     End If
-
-                    'Window.Topmost = True
-                    'Window.WindowState = WindowState.Normal
-                    'Window.Activate()
-                    'Window.Topmost = False
-
                     DisplayCurrentUserOnFooter()
                     Await UpdateClientButtonStatus()
                     Return True
@@ -726,6 +703,17 @@ Partial Public Class MainWindow : Inherits Window
         End Select
     End Sub
 
+    Public Function GetCurrentUpdateSourceName()
+        Select Case UpdateSource
+            Case "AIR_Official"
+                Return "AIR Classic"
+            Case "AIR_Plus"
+                Return "AIR Plus"
+            Case Else
+                Return "Unknown"
+        End Select
+    End Function
+
     Private Sub ChangeUpdateSourceButton_Click(sender As Object, e As EventArgs) Handles ChangeUpdateSourceButton.Click
         Select Case UpdateSource
             Case "AIR_Official"
@@ -896,9 +884,12 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Private Sub MainWindow_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
-        If NamedPipeCancellationTokenSource.IsCancellationRequested = False Then
-            StopPipedLoginTicketListener()
-        End If
+        Try
+            If NamedPipeCancellationTokenSource.IsCancellationRequested = False Then
+                StopPipedLoginTicketListener()
+            End If
+        Catch
+        End Try
     End Sub
 
     Private Sub HabboLogoButton_ContextMenuClosed(sender As Object, e As EventArgs)
@@ -1029,24 +1020,49 @@ Partial Public Class MainWindow : Inherits Window
         Window.Close()
     End Sub
 
+    Private Async Function EnsureWindowFocus(RequestedWindow As Window) As Task(Of Boolean)
+        Try
+            RequestedWindow.Show()
+            RequestedWindow.WindowState = WindowState.Minimized
+            Await Task.Delay(100)
+            RequestedWindow.WindowState = WindowState.Normal
+            RequestedWindow.Activate()
+            Return True
+        Catch ex As Exception
+            Return False
+        End Try
+    End Function
+
+    Private Function ToggleWindowVisibility(RequestedWindow As Window, IsVisible As Boolean) As Boolean
+        Try
+            RequestedWindow.IsEnabled = IsVisible
+            RequestedWindow.ShowInTaskbar = IsVisible
+            If IsVisible Then
+                RequestedWindow.Opacity = 1
+                RequestedWindow.WindowState = WindowState.Normal
+            Else
+                RequestedWindow.Opacity = 0
+                RequestedWindow.WindowState = WindowState.Minimized
+            End If
+        Catch ex As Exception
+            Return False
+        End Try
+    End Function
+
     Private Sub StartNewInstanceButton_PropertyChanged(sender As Object, e As AvaloniaPropertyChangedEventArgs) Handles StartNewInstanceButton.PropertyChanged
         If e.Property.Name = "Text" Then
             If LoadingWindowChild IsNot Nothing Then
                 If StartNewInstanceButton.Text.StartsWith(AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt)) Then 'Update fail
+                    LoadingWindowCloseRequested = True
                     LoadingWindowChild.Close()
                     LoadingWindowChild = Nothing
-                    Window.IsEnabled = True
-                    Window.ShowInTaskbar = True
-                    Window.Opacity = 1
-                    Window.Show()
-                    Window.BringIntoView()
-                    Window.Focus()
-                    Window.Activate()
+                    ToggleWindowVisibility(Window, True)
                     Return
                 End If
                 If StartNewInstanceButton.Text.StartsWith(AppTranslator.LaunchClientVersion(CurrentLanguageInt)) Then 'Launch client
                     LoadingWindowClientLaunchRequested = True
-                    StartNewInstanceButton_Click(Nothing, Nothing)
+                    'StartNewInstanceButton_Click(Nothing, Nothing)
+                    LaunchClientFromLoadingWindowWithDelay(3)
                     Return
                 End If
                 If StartNewInstanceButton.Text.StartsWith(AppTranslator.UnknownClientVersion(CurrentLanguageInt)) AndAlso LoadingWindowClientLaunchRequested = True Then 'Client launched
@@ -1061,9 +1077,36 @@ Partial Public Class MainWindow : Inherits Window
                 If StartNewInstanceButton.Text.StartsWith(AppTranslator.DownloadingClient(CurrentLanguageInt)) Or StartNewInstanceButton.Text.StartsWith(AppTranslator.ExtractingClient(CurrentLanguageInt)) Then 'Client downloading or extracting
                     LoadingWindowChild.StatusLabel.Text = e.NewValue
                 Else
-                    LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) 'Generic loading
+                    LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) & " ..." 'Generic loading
                 End If
             End If
+        End If
+    End Sub
+
+    Private Async Sub LaunchClientFromLoadingWindowWithDelay(DelaySeconds As Integer)
+        Do Until DelaySeconds = 0 Or LoadingWindowChild Is Nothing
+            LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) & " " & GetCurrentUpdateSourceName() & " (" & DelaySeconds & "s)" 'Generic loading
+            Await Task.Delay(1000)
+            DelaySeconds -= 1
+        Loop
+        If LoadingWindowChild IsNot Nothing Then
+            LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) & " " & GetCurrentUpdateSourceName()
+            StartNewInstanceButton_Click(Nothing, Nothing)
+        End If
+    End Sub
+
+    Private Sub LoadingWindowChild_Closed(sender As Object, e As EventArgs) Handles LoadingWindowChild.Closed
+        If LoadingWindowCloseRequested = True Then
+            LoadingWindowChild = Nothing
+            ToggleWindowVisibility(Window, True)
+        Else
+            Window.Close()
+        End If
+    End Sub
+
+    Private Sub MainWindow_Activated(sender As Object, e As EventArgs) Handles Me.Activated
+        If LoadingWindowChild IsNot Nothing Then
+            EnsureWindowFocus(LoadingWindowChild)
         End If
     End Sub
 End Class
@@ -1159,8 +1202,8 @@ End Class
 Public Class AppTranslator
     '0=English 1=Spanish
     Public Shared GenericLoading As String() = {
-        "Loading ...",
-        "Cargando ..."
+        "Loading",
+        "Cargando"
     }
     Public Shared DownloadingClient As String() = {
         "Downloading client",

@@ -3,7 +3,9 @@ Imports System.Runtime.InteropServices
 Imports System.Security.Cryptography
 Imports Avalonia
 Imports Avalonia.Controls
+Imports Avalonia.Controls.ApplicationLifetimes
 Imports Avalonia.Controls.Primitives.PopupPositioning
+Imports Avalonia.Input
 Imports Avalonia.Markup.Xaml
 Imports Avalonia.Media
 Imports Avalonia.Threading
@@ -11,16 +13,15 @@ Imports Path = System.IO.Path
 
 Partial Public Class LoadingWindow : Inherits Window
     Private WithEvents Window As Window
-    Private WithEvents DollChair As Image
+    Private WithEvents TitleBarLabel As Label
     Public WithEvents StatusLabel As TextBlock
     Private WithEvents CloseButton As CustomButton
-    Private ExitBlocked As Boolean = False
+    Private WithEvents MainMenuButton As CustomButton
     Public CurrentLanguageInt As Integer = 0
     Public PreviousLauncherFilename As String = ""
 
     Sub New()
         InitializeComponent() ' This call is required by the designer
-        StartAnimation()
     End Sub
 
     ' Auto-wiring does not work for VB, so do it manually
@@ -34,9 +35,12 @@ Partial Public Class LoadingWindow : Inherits Window
         End If
         'Example: Control = FindNameScope().Find("Control_Name")
         Window = FindNameScope().Find("Window")
-        DollChair = FindNameScope().Find("DollChair")
+        TitleBarLabel = Window.FindNameScope.Find("TitleBarLabel")
         StatusLabel = FindNameScope().Find("StatusLabel")
         CloseButton = FindNameScope().Find("CloseButton")
+        MainMenuButton = FindNameScope().Find("MainMenuButton")
+
+        MainMenuButton.Text = LauncherUpdaterTranslator.ReturnToMainMenu(CurrentLanguageInt)
 
         Return
 
@@ -96,7 +100,6 @@ Partial Public Class LoadingWindow : Inherits Window
         Catch
             StatusLabel.Text = LauncherUpdaterTranslator.UpdateError(CurrentLanguageInt)
         End Try
-        ExitBlocked = False
     End Sub
 
     Function MakeUnixExecutable(ByVal filePath As String) As Boolean
@@ -203,40 +206,36 @@ $")"
 
     End Sub
 
-    Private Sub StartAnimation()
-        Dim imagen = Me.FindControl(Of Image)("DollChair")
-        Dim rotateTransform = TryCast(imagen.RenderTransform, RotateTransform)
-        If rotateTransform Is Nothing Then Return
-
-        imagen.RenderTransformOrigin = New RelativePoint(0.5, 1, RelativeUnit.Relative)
-
-        Dim rotationTimer As New DispatcherTimer()
-        rotationTimer.Interval = TimeSpan.FromMilliseconds(50) '60
-
-        Dim stepSize As Double = 0.3
-
-        AddHandler rotationTimer.Tick, Sub()
-                                           rotateTransform.Angle += stepSize
-                                           If rotateTransform.Angle >= 3 OrElse rotateTransform.Angle <= -3 Then
-                                               stepSize *= -1
-                                           End If
-                                       End Sub
-        rotationTimer.Start()
-    End Sub
-
     Private Sub CloseButton_Click(sender As Object, e As EventArgs) Handles CloseButton.Click
         Window.Close()
     End Sub
 
-    Private Sub Window_Closing(sender As Object, e As WindowClosingEventArgs) Handles Window.Closing
-        If ExitBlocked = True Then
-            e.Cancel = True
+    Private Function GetMainWindow() As MainWindow
+        Dim lifetime = TryCast(Application.Current.ApplicationLifetime, IClassicDesktopStyleApplicationLifetime)
+        Dim mainWindow = lifetime.MainWindow
+        Return mainWindow
+    End Function
+
+    Private Sub MainMenuButton_Click(sender As Object, e As EventArgs) Handles MainMenuButton.Click
+        GetMainWindow.LoadingWindowCloseRequested = True
+        Window.Close()
+    End Sub
+
+    Private Sub TitleBarLabel_PointerPressed(sender As Object, e As PointerPressedEventArgs) Handles TitleBarLabel.PointerPressed
+        ' Solo con botón izquierdo
+        If e.GetCurrentPoint(TitleBarLabel).Properties.IsLeftButtonPressed Then
+            ' Avalonia se encarga de DPI y límites automáticamente
+            Me.BeginMoveDrag(e)
         End If
     End Sub
 End Class
 
 Public Class LauncherUpdaterTranslator
     '0=English 1=Spanish
+    Public Shared ReturnToMainMenu As String() = {
+        "Return to main menu",
+        "Volver al menu principal"
+    }
     Public Shared VerifyingUpdate As String() = {
         "Verifying update ...",
         "Verificando actualizacion ..."

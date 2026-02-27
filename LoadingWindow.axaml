@@ -5,29 +5,32 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:HabboCustomLauncher"
         x:Name="Window"
-        mc:Ignorable="d" Width="600" Height="150" CanResize="False" SystemDecorations="BorderOnly" Opacity="1"
+        mc:Ignorable="d" Width="602" Height="212" CanResize="False" SystemDecorations="BorderOnly" Opacity="1"
         Title="HabboCustomLauncher"
-        WindowStartupLocation="CenterScreen" Background="#42062E" FontFamily="{StaticResource NewSegoeUI}" Icon="/Assets/HabboCustomLauncherIcon.ico">
-  <Grid>
-    <Grid.RowDefinitions>
-      <RowDefinition Height="32"/>
-      <RowDefinition Height="*"/>
-    </Grid.RowDefinitions>
-    <Label Grid.Row="0" Background="#A22A60" Foreground="White" Content="    HabboCustomLauncher" VerticalContentAlignment="Center"/>
-    <local:CustomButton x:Name="CloseButton" IsFocusable="False" Grid.Row="0" Foreground="White" HorizontalAlignment="Right" Text="   X   " BackColor="#78FF0000"/>
-    <Grid Grid.Row="1">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="Auto"/>
-        <ColumnDefinition Width="*"/>
-      </Grid.ColumnDefinitions>
-      <Grid Background="#1A000000">
-        <Image x:Name="DollChair" Source="/Assets/DollChair.png" HorizontalAlignment="Left" Margin="10,10" RenderTransformOrigin="0.5,0.5">
-          <Image.RenderTransform>
-            <RotateTransform Angle="0"/>
-          </Image.RenderTransform>
-        </Image>
-      </Grid>
-      <TextBlock x:Name="StatusLabel" Margin="15" Text="Unknown status!" TextTrimming="CharacterEllipsis" Foreground="White" FontSize="30" Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-    </Grid>
-  </Grid>
+        WindowStartupLocation="CenterScreen" Background="Black" FontFamily="{StaticResource NewSegoeUI}" Icon="/Assets/HabboCustomLauncherIcon.ico">
+	<Grid>
+		<Canvas ClipToBounds="true">
+			<Image Source="/Assets/modal-backdrop-pink.png" Canvas.Left="-300" Canvas.Top="-100" Stretch="Uniform"/>
+		</Canvas>
+		<Grid>
+			<Grid.RowDefinitions>
+				<RowDefinition Height="32"/>
+				<RowDefinition Height="*"/>
+			</Grid.RowDefinitions>
+			<Label Name="TitleBarLabel" Grid.Row="0" Background="#A22A60" Foreground="White" Content="    HabboCustomLauncher" VerticalContentAlignment="Center"/>
+			<local:CustomButton x:Name="CloseButton" IsFocusable="False" Grid.Row="0" Foreground="White" HorizontalAlignment="Right" Text="   X   " BackColor="#78FF0000"/>
+			<Border Grid.Row="1" BorderThickness="1,0,1,1" BorderBrush="#A22A60">
+				<Grid>
+					<Grid.RowDefinitions>
+						<RowDefinition Height="*"/>
+						<RowDefinition Height="1"/>
+						<RowDefinition Height="60"/>
+					</Grid.RowDefinitions>
+					<TextBlock x:Name="StatusLabel" Grid.Row="0" Margin="15" Text="Unknown status!" TextTrimming="CharacterEllipsis" Foreground="White" FontSize="30" Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+					<Grid Grid.Row="1" Background="#A22A60" Opacity="0.2"/>
+					<local:CustomButton x:Name="MainMenuButton" Grid.Row="2" Text="Return to main menu" Margin="10"/>
+				</Grid>
+			</Border>
+		</Grid>
+	</Grid>
 </Window>
