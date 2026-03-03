@@ -47,7 +47,7 @@ Partial Public Class MainWindow : Inherits Window
     Private ReadOnly HttpClient As New HttpClient()
     Private NamedPipeCancellationTokenSource As CancellationTokenSource
     Public UnixPatchName As String = "HabboAirLinuxPatch_x64.zip" 'Depending on the platform, it can automatically become HabboAirLinuxPatch_x64.zip and HabboAirOSXPatch.zip
-    Public WindowsPatchName As String = "HabboAirWindowsPatch_x86.zip"
+    Public WindowsPatchName As String = "HabboAirWindowsPatch_x86.zip" 'Depending on the architecture, it can automatically become HabboAirWindowsPatch_x64.zip
     Public AirPlusPatchName As String = "HabboAirPlusPatch.zip"
     Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
     Public AirPlusClientURL = "https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf"
@@ -131,11 +131,18 @@ Partial Public Class MainWindow : Inherits Window
         FixWindowsTLS()
         RegisterHabboProtocol()
 
+        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) AndAlso RuntimeInformation.OSArchitecture = Architecture.X64 Then
+            WindowsPatchName = "HabboAirWindowsPatch_x64.zip"
+        End If
         If (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) Or RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD)) AndAlso RuntimeInformation.ProcessArchitecture = Architecture.Arm64 Then
             UnixPatchName = "HabboAirLinuxPatch_arm64.zip"
         End If
         If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
-            UnixPatchName = "HabboAirOSXPatch.zip"
+            If OperatingSystem.IsMacOSVersionAtLeast(26, 0) Then
+                UnixPatchName = "HabboAirOSXTahoePatch.zip"
+            Else
+                UnixPatchName = "HabboAirOSXPatch.zip"
+            End If
         End If
 
         LoadSavedUpdateSource()
@@ -173,7 +180,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 19 (27/02/2026)"
+        FooterButton.Text = "CustomLauncher version 20 (03/03/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -356,10 +363,24 @@ Partial Public Class MainWindow : Inherits Window
                 End If
             End If
 
-
             UpdateAirApplicationXML()
+
+            If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) AndAlso IO.File.ReadAllText(Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")).Contains("<extensions>") Then
+                Dim HabboAirOSXDiscordPatchName = "HabboAirOSXDiscordPatch.zip"
+                Await Task.Run(Sub() CopyEmbeddedAsset(HabboAirOSXDiscordPatchName, ClientFolderPath))
+                Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, HabboAirOSXDiscordPatchName), ClientFolderPath, True))
+                File.Delete(Path.Combine(ClientFolderPath, HabboAirOSXDiscordPatchName))
+            End If
+
+            Dim AirCustomLicensePath = Path.Combine(ClientFolderPath, "license.txt")
+            If IO.File.Exists(AirCustomLicensePath) Then
+                IO.File.Move(AirCustomLicensePath, Path.Combine(ClientFolderPath, "META-INF", "AIR", "license.txt"), True)
+            End If
+
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
-                ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 50) 'OSX is limited to AIR version 50.2.3.8 to provide compatibility with OSX 10.12+, so the swf version will be forced to 50
+                If OperatingSystem.IsMacOSVersionAtLeast(26, 0) = False Then
+                    ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 50) 'OSX is limited to AIR version 50.2.3.8 to improve performance and provide compatibility with OSX 10.12+, so the swf version will be forced to 50
+                End If
                 FixOSXClientStructure()
                 MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"))
                 CodesignDeepForceOSX(Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"))
@@ -437,8 +458,8 @@ Partial Public Class MainWindow : Inherits Window
             OriginalXmlVersionNumber = "1.0"
             OriginalXmlExtensionsNode = Nothing
         End If
-        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False Then
-            OriginalXmlExtensionsNode = Nothing 'In the future, AIR extensions support for OSX (and perhaps Linux, if possible) should be added.
+        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False AndAlso RuntimeInformation.IsOSPlatform(OSPlatform.OSX) = False Then
+            OriginalXmlExtensionsNode = Nothing 'In the future, AIR extensions support for Linux, if possible, should be added.
         End If
         xmlDoc = XDocument.Load(NewXmlPath)
         xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "versionLabel").Value = OriginalXmlVersionNumber ' Reemplaza con el nuevo valor
@@ -738,7 +759,9 @@ Partial Public Class MainWindow : Inherits Window
             FocusManager.ClearFocus()
             UpdateClientButtonStatus()
         Catch ex As Exception
-            'Ignore error
+            Dim ErrorDialog As New MessageBox()
+            ErrorDialog.ConfigureContent("Error", AppTranslator.ClientDeleteError(CurrentLanguageInt))
+            ErrorDialog.ShowDialog(Window)
         End Try
     End Sub
 
@@ -996,9 +1019,9 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Sub ChangeUpdateSourceButton2_Click(sender As Object, e As EventArgs) Handles ChangeUpdateSourceButton2.Click
         Dim contextMenu As New ContextMenu
-        Dim ClientHint As String = "The official classic Habbo client without modifications."
+        Dim ClientHint As String = AppTranslator.ClassicAirClientHint(CurrentLanguageInt)
         If UpdateSource = "AIR_Plus" Then
-            ClientHint = "The classic Habbo client with unofficial modifications."
+            ClientHint = AppTranslator.AirPlusClientHint(CurrentLanguageInt)
         End If
         contextMenu.Items.Add(New MenuItem With {.Header = ClientHint})
         If ChangeUpdateSourceButton2.ContextMenu IsNot Nothing Then
@@ -1022,7 +1045,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Async Function EnsureWindowFocus(RequestedWindow As Window) As Task(Of Boolean)
         Try
-            RequestedWindow.Show()
+            RequestedWindow.Show() 'Quizas convendria hacer un ShowDialog(Window) especificamente para el LoadingWindow pero luego queda abierto en el background, reformar codigo! Quizas usando luego Window.Owner desde el LoadingWindow
             RequestedWindow.WindowState = WindowState.Minimized
             Await Task.Delay(100)
             RequestedWindow.WindowState = WindowState.Normal
@@ -1268,5 +1291,17 @@ Public Class AppTranslator
     Public Shared AutomaticHabboProtocol As String() = {
         "Automatic habbo protocol",
         "Habbo protocol automatico"
+    }
+    Public Shared ClientDeleteError As String() = {
+        "Client version could not be deleted!",
+        "No se pudo eliminar la version del cliente!"
+    }
+    Public Shared ClassicAirClientHint As String() = {
+        "The official classic Habbo client without modifications.",
+        "El cliente clasico oficial de Habbo sin modificaciones."
+    }
+    Public Shared AirPlusClientHint As String() = {
+        "The classic Habbo client with unofficial modifications.",
+        "El cliente clasico de Habbo con modificaciones no oficiales."
     }
 End Class
