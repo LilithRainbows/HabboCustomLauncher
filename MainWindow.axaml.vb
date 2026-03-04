@@ -180,7 +180,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 20 (03/03/2026)"
+        FooterButton.Text = "CustomLauncher version 21 (04/03/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -365,22 +365,37 @@ Partial Public Class MainWindow : Inherits Window
 
             UpdateAirApplicationXML()
 
-            If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) AndAlso IO.File.ReadAllText(Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")).Contains("<extensions>") Then
-                Dim HabboAirOSXDiscordPatchName = "HabboAirOSXDiscordPatch.zip"
-                Await Task.Run(Sub() CopyEmbeddedAsset(HabboAirOSXDiscordPatchName, ClientFolderPath))
-                Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, HabboAirOSXDiscordPatchName), ClientFolderPath, True))
-                File.Delete(Path.Combine(ClientFolderPath, HabboAirOSXDiscordPatchName))
+            If IO.File.ReadAllText(Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")).Contains("<extensions>") Then
+                If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+                    Dim HabboAirExtensionsOSXPatchName = "HabboAirExtensionsOSXPatch.zip"
+                    Await Task.Run(Sub() CopyEmbeddedAsset(HabboAirExtensionsOSXPatchName, ClientFolderPath))
+                    Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, HabboAirExtensionsOSXPatchName), ClientFolderPath, True))
+                    File.Delete(Path.Combine(ClientFolderPath, HabboAirExtensionsOSXPatchName))
+                End If
+                If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
+                    Dim HabboAirExtensionsWindowsPatchName = "HabboAirExtensionsWindowsPatch.zip"
+                    Await Task.Run(Sub() CopyEmbeddedAsset(HabboAirExtensionsWindowsPatchName, ClientFolderPath))
+                    Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, HabboAirExtensionsWindowsPatchName), ClientFolderPath, True))
+                    File.Delete(Path.Combine(ClientFolderPath, HabboAirExtensionsWindowsPatchName))
+                End If
             End If
 
-            Dim AirCustomLicensePath = Path.Combine(ClientFolderPath, "license.txt")
+                Dim AirCustomLicensePath = Path.Combine(ClientFolderPath, "license.txt")
             If IO.File.Exists(AirCustomLicensePath) Then
                 IO.File.Move(AirCustomLicensePath, Path.Combine(ClientFolderPath, "META-INF", "AIR", "license.txt"), True)
             End If
 
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
-                If OperatingSystem.IsMacOSVersionAtLeast(26, 0) = False Then
+                If OperatingSystem.IsMacOSVersionAtLeast(26, 0) Then
+                    ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 51) 'OSX Tahoe and later needs AIR 51+ to avoid keyboard shortcuts bugs
+                Else
                     ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 50) 'OSX is limited to AIR version 50.2.3.8 to improve performance and provide compatibility with OSX 10.12+, so the swf version will be forced to 50
                 End If
+            Else
+                ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 51) 'Windows and Linux works with AIR 51+
+            End If
+
+            If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
                 FixOSXClientStructure()
                 MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"))
                 CodesignDeepForceOSX(Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"))

@@ -42,6 +42,7 @@
   <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x86' OR '$(Configuration)' == 'Debug'">
     <AvaloniaResource Include="Assets\HabboAirWindowsPatch_x86.zip" />
     <AvaloniaResource Include="Assets\HabboAirWindowsPatch_x64.zip" />
+    <AvaloniaResource Include="Assets\HabboAirExtensionsWindowsPatch.zip" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64' OR '$(Configuration)' == 'Debug'">
@@ -55,14 +56,14 @@
   <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64' OR '$(Configuration)' == 'Debug'">
     <AvaloniaResource Include="Assets\HabboAirOSXPatch.zip" />
     <AvaloniaResource Include="Assets\HabboAirOSXTahoePatch.zip" />
-    <AvaloniaResource Include="Assets\HabboAirOSXDiscordPatch.zip" />
+    <AvaloniaResource Include="Assets\HabboAirExtensionsOSXPatch.zip" />
     <AvaloniaResource Include="Assets\LauncherShortcutOSXPatch.zip" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-arm64' OR '$(Configuration)' == 'Debug'">
     <AvaloniaResource Include="Assets\HabboAirOSXPatch.zip" />
     <AvaloniaResource Include="Assets\HabboAirOSXTahoePatch.zip" />
-    <AvaloniaResource Include="Assets\HabboAirOSXDiscordPatch.zip" />
+    <AvaloniaResource Include="Assets\HabboAirExtensionsOSXPatch.zip" />
     <AvaloniaResource Include="Assets\LauncherShortcutOSXPatch.zip" />
   </ItemGroup>
 
