@@ -180,7 +180,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 21 (04/03/2026)"
+        FooterButton.Text = "CustomLauncher version 21 (05/03/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -266,7 +266,7 @@ Partial Public Class MainWindow : Inherits Window
         process.WaitForExit()
     End Sub
 
-    Public Sub UnzipIgnoringIOExceptions(sourcezip As String, destinationfolder As String, overwrite As Boolean)
+    Public Sub UnzipFile(sourcezip As String, destinationfolder As String, overwrite As Boolean, Optional IgnoreIOExceptions As Boolean = False)
         Using archive As ZipArchive = ZipFile.OpenRead(sourcezip)
             For Each entry As ZipArchiveEntry In archive.Entries
                 Try
@@ -287,6 +287,9 @@ Partial Public Class MainWindow : Inherits Window
                     ' Extraer el archivo
                     entry.ExtractToFile(destinationFilePath, overwrite)
                 Catch ex As IOException
+                    If IgnoreIOExceptions = False Then
+                        Throw
+                    End If
                     'Console.WriteLine($"No se pudo extraer {entry.FullName}: {ex.Message}")
                 End Try
             Next
@@ -346,13 +349,13 @@ Partial Public Class MainWindow : Inherits Window
 
 
             Await Task.Run(Sub() CopyEmbeddedAsset(GetAirPatchNameForCurrentOS, ClientFolderPath))
-            Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS), ClientFolderPath, True))
+            Await Task.Run(Sub() UnzipFile(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS), ClientFolderPath, True))
             File.Delete(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS))
 
 
             If UpdateSource = "AIR_Plus" Then
                 Await Task.Run(Sub() CopyEmbeddedAsset(AirPlusPatchName, ClientFolderPath))
-                Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, AirPlusPatchName), ClientFolderPath, True))
+                Await Task.Run(Sub() UnzipFile(Path.Combine(ClientFolderPath, AirPlusPatchName), ClientFolderPath, True))
                 File.Delete(Path.Combine(ClientFolderPath, AirPlusPatchName))
             Else
                 Await Task.Run(Sub() ExtractTrimmedOfficialAirClient(ClientFilePath, ClientFolderPath))
@@ -369,18 +372,18 @@ Partial Public Class MainWindow : Inherits Window
                 If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
                     Dim HabboAirExtensionsOSXPatchName = "HabboAirExtensionsOSXPatch.zip"
                     Await Task.Run(Sub() CopyEmbeddedAsset(HabboAirExtensionsOSXPatchName, ClientFolderPath))
-                    Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, HabboAirExtensionsOSXPatchName), ClientFolderPath, True))
+                    Await Task.Run(Sub() UnzipFile(Path.Combine(ClientFolderPath, HabboAirExtensionsOSXPatchName), ClientFolderPath, True))
                     File.Delete(Path.Combine(ClientFolderPath, HabboAirExtensionsOSXPatchName))
                 End If
                 If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
                     Dim HabboAirExtensionsWindowsPatchName = "HabboAirExtensionsWindowsPatch.zip"
                     Await Task.Run(Sub() CopyEmbeddedAsset(HabboAirExtensionsWindowsPatchName, ClientFolderPath))
-                    Await Task.Run(Sub() UnzipIgnoringIOExceptions(Path.Combine(ClientFolderPath, HabboAirExtensionsWindowsPatchName), ClientFolderPath, True))
+                    Await Task.Run(Sub() UnzipFile(Path.Combine(ClientFolderPath, HabboAirExtensionsWindowsPatchName), ClientFolderPath, True))
                     File.Delete(Path.Combine(ClientFolderPath, HabboAirExtensionsWindowsPatchName))
                 End If
             End If
 
-                Dim AirCustomLicensePath = Path.Combine(ClientFolderPath, "license.txt")
+            Dim AirCustomLicensePath = Path.Combine(ClientFolderPath, "license.txt")
             If IO.File.Exists(AirCustomLicensePath) Then
                 IO.File.Move(AirCustomLicensePath, Path.Combine(ClientFolderPath, "META-INF", "AIR", "license.txt"), True)
             End If
@@ -425,6 +428,9 @@ Partial Public Class MainWindow : Inherits Window
             ChangeUpdateSourceButton2.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt)
             'Clipboard.SetTextAsync(ex.ToString)
+            Dim ErrorDialog As New MessageBox()
+            ErrorDialog.ConfigureContent("Error (CTRL + C to copy)", ex.ToString)
+            ErrorDialog.ShowDialog(Window)
         End Try
     End Function
 
@@ -1147,6 +1153,7 @@ Partial Public Class MainWindow : Inherits Window
             EnsureWindowFocus(LoadingWindowChild)
         End If
     End Sub
+
 End Class
 
 Public Class JsonClientUrls
