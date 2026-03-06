@@ -266,12 +266,34 @@ Partial Public Class MainWindow : Inherits Window
         process.WaitForExit()
     End Sub
 
-    Public Sub UnzipFile(sourcezip As String, destinationfolder As String, overwrite As Boolean, Optional IgnoreIOExceptions As Boolean = False)
+    Public Sub UnzipFile(sourcezip As String, destinationfolder As String, overwrite As Boolean, Optional itemsToSkip As List(Of String) = Nothing, Optional IgnoreIOExceptions As Boolean = False)
         Dim basePath As String = Path.GetFullPath(destinationfolder)
         Using archive As ZipArchive = ZipFile.OpenRead(sourcezip)
             For Each entry As ZipArchiveEntry In archive.Entries
                 Try
                     Dim relativePath As String = entry.FullName.Replace("/"c, Path.DirectorySeparatorChar).Replace("\"c, Path.DirectorySeparatorChar)
+
+                    ' ---- FILTRO DE EXCLUSIÓN ----
+                    If itemsToSkip IsNot Nothing Then
+
+                        Dim normalized = relativePath.TrimStart(Path.DirectorySeparatorChar)
+                        Dim skipEntry As Boolean = False
+
+                        For Each skip In itemsToSkip
+                            Dim skipNorm = skip.Replace("/"c, Path.DirectorySeparatorChar).Replace("\"c, Path.DirectorySeparatorChar)
+                            If String.Equals(normalized, skipNorm, StringComparison.OrdinalIgnoreCase) Then
+                                skipEntry = True
+                                Exit For
+                            End If
+                            If normalized.StartsWith(skipNorm & Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) Then
+                                skipEntry = True
+                                Exit For
+                            End If
+                        Next
+                        If skipEntry Then Continue For
+                    End If
+                    ' -----------------------------
+
                     Dim destinationFilePath As String = Path.GetFullPath(Path.Combine(basePath, relativePath))
                     If Not destinationFilePath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase) Then
                         Throw New IOException("Zip slip error!")
@@ -288,23 +310,6 @@ Partial Public Class MainWindow : Inherits Window
                 Catch ex As IOException
                     If Not IgnoreIOExceptions Then Throw
                 End Try
-            Next
-        End Using
-    End Sub
-
-
-    Public Sub ExtractTrimmedOfficialAirClient(FullClientZipFile As String, ClientFolderPath As String)
-        Dim itemsToSkip As New List(Of String) From {"Adobe AIR", "META-INF/signatures.xml", "META-INF/AIR/hash", "Habbo.exe"}
-        Using archive As ZipArchive = ZipFile.OpenRead(FullClientZipFile)
-            For Each entry As ZipArchiveEntry In archive.Entries
-                If itemsToSkip.Any(Function(item) entry.FullName.StartsWith(item, StringComparison.OrdinalIgnoreCase)) = False Then
-                    Dim fullPath As String = Path.Combine(ClientFolderPath, entry.FullName)
-                    Dim mydirectory = Path.GetDirectoryName(fullPath)
-                    Directory.CreateDirectory(mydirectory)
-                    If Directory.Exists(fullPath) = False Then
-                        entry.ExtractToFile(fullPath, overwrite:=True)
-                    End If
-                End If
             Next
         End Using
     End Sub
@@ -355,7 +360,8 @@ Partial Public Class MainWindow : Inherits Window
                 Await Task.Run(Sub() UnzipFile(Path.Combine(ClientFolderPath, AirPlusPatchName), ClientFolderPath, True))
                 File.Delete(Path.Combine(ClientFolderPath, AirPlusPatchName))
             Else
-                Await Task.Run(Sub() ExtractTrimmedOfficialAirClient(ClientFilePath, ClientFolderPath))
+                Dim itemsToSkip As New List(Of String) From {"Adobe AIR", "META-INF/signatures.xml", "META-INF/AIR/hash", "Habbo.exe"}
+                Await Task.Run(Sub() UnzipFile(ClientFilePath, ClientFolderPath, True, itemsToSkip))
                 Await Task.Run(Sub() File.Delete(ClientFilePath))
                 Dim ClientSwfType = GetSwfType(Path.Combine(ClientFolderPath, "HabboAir.swf"))
                 If ClientSwfType.StartsWith("cWS") Or ClientSwfType.StartsWith("fWS") Or ClientSwfType.StartsWith("zWS") Then
