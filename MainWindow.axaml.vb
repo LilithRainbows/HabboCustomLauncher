@@ -180,7 +180,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 21 (05/03/2026)"
+        FooterButton.Text = "CustomLauncher version 22 (06/03/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -267,34 +267,31 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Public Sub UnzipFile(sourcezip As String, destinationfolder As String, overwrite As Boolean, Optional IgnoreIOExceptions As Boolean = False)
+        Dim basePath As String = Path.GetFullPath(destinationfolder)
         Using archive As ZipArchive = ZipFile.OpenRead(sourcezip)
             For Each entry As ZipArchiveEntry In archive.Entries
                 Try
-                    Dim destinationFilePath As String = Path.Combine(destinationfolder, entry.FullName.Replace("/", Path.DirectorySeparatorChar).Replace("\\", Path.DirectorySeparatorChar))
-
-                    ' Verificar si es un directorio y crearlo
-                    If destinationFilePath.EndsWith(Path.DirectorySeparatorChar) Then
+                    Dim relativePath As String = entry.FullName.Replace("/"c, Path.DirectorySeparatorChar).Replace("\"c, Path.DirectorySeparatorChar)
+                    Dim destinationFilePath As String = Path.GetFullPath(Path.Combine(basePath, relativePath))
+                    If Not destinationFilePath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase) Then
+                        Throw New IOException("Zip slip error!")
+                    End If
+                    If String.IsNullOrEmpty(entry.Name) Then
                         Directory.CreateDirectory(destinationFilePath)
-                        Continue For ' No intentar extraer directorios
+                        Continue For
                     End If
-
-                    ' Crear directorios padre si no existen
-                    Dim destinationDir As String = Path.GetDirectoryName(destinationFilePath)
-                    If Not Directory.Exists(destinationDir) Then
-                        Directory.CreateDirectory(destinationDir)
+                    Dim dir As String = Path.GetDirectoryName(destinationFilePath)
+                    If Not String.IsNullOrEmpty(dir) Then
+                        Directory.CreateDirectory(dir)
                     End If
-
-                    ' Extraer el archivo
                     entry.ExtractToFile(destinationFilePath, overwrite)
                 Catch ex As IOException
-                    If IgnoreIOExceptions = False Then
-                        Throw
-                    End If
-                    'Console.WriteLine($"No se pudo extraer {entry.FullName}: {ex.Message}")
+                    If Not IgnoreIOExceptions Then Throw
                 End Try
             Next
         End Using
     End Sub
+
 
     Public Sub ExtractTrimmedOfficialAirClient(FullClientZipFile As String, ClientFolderPath As String)
         Dim itemsToSkip As New List(Of String) From {"Adobe AIR", "META-INF/signatures.xml", "META-INF/AIR/hash", "Habbo.exe"}
@@ -438,6 +435,7 @@ Partial Public Class MainWindow : Inherits Window
         ' Rutas de origen y destino
         Dim origen As String = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
         Dim destino As String = Path.Combine(origen, "Habbo.app", "Contents", "Resources")
+        Directory.CreateDirectory(destino)
 
         ' Exclusiones
         Dim carpetaExcluida As String = "Habbo.app"
@@ -448,8 +446,9 @@ Partial Public Class MainWindow : Inherits Window
             Dim nombreArchivo As String = Path.GetFileName(archivo)
             If Not nombreArchivo.Equals(archivoExcluido, StringComparison.OrdinalIgnoreCase) Then
                 Dim destinoArchivo As String = Path.Combine(destino, nombreArchivo)
-                'Console.WriteLine(nombreArchivo & " > " & destino)
-                File.Move(archivo, destinoArchivo)
+                If Not String.Equals(archivo, destinoArchivo, StringComparison.OrdinalIgnoreCase) Then
+                    File.Move(archivo, destinoArchivo, True)
+                End If
             End If
         Next
 
@@ -457,11 +456,27 @@ Partial Public Class MainWindow : Inherits Window
         For Each carpeta In Directory.GetDirectories(origen)
             Dim nombreCarpeta As String = Path.GetFileName(carpeta)
             If Not nombreCarpeta.Equals(carpetaExcluida, StringComparison.OrdinalIgnoreCase) Then
-                Dim destinoCarpeta As String = Path.Combine(destino, nombreCarpeta)
-                'Console.WriteLine(carpeta & " > " & destinoCarpeta)
-                Directory.Move(carpeta, destinoCarpeta)
+                Dim destinoCarpeta = Path.Combine(destino, nombreCarpeta)
+                MoveMerge(carpeta, destinoCarpeta)
             End If
         Next
+    End Sub
+
+    Sub MoveMerge(sourceDir As String, targetDir As String)
+        Directory.CreateDirectory(targetDir)
+        For Each CurrFile In Directory.GetFiles(sourceDir)
+            Dim destFile = Path.Combine(targetDir, Path.GetFileName(CurrFile))
+            If Not String.Equals(CurrFile, destFile, StringComparison.OrdinalIgnoreCase) Then
+                File.Move(CurrFile, destFile, True)
+            End If
+        Next
+        For Each CurrDir In Directory.GetDirectories(sourceDir)
+            Dim destSubDir = Path.Combine(targetDir, Path.GetFileName(CurrDir))
+            MoveMerge(CurrDir, destSubDir)
+        Next
+        If Directory.Exists(sourceDir) AndAlso Not Directory.EnumerateFileSystemEntries(sourceDir).Any() Then
+            Directory.Delete(sourceDir)
+        End If
     End Sub
 
     Public Sub UpdateAirApplicationXML()
