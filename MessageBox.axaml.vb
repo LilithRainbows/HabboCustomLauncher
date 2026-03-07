@@ -2,6 +2,8 @@
 Imports Avalonia.Input
 Imports Avalonia.Markup.Xaml
 Imports Avalonia.Media
+Imports Avalonia.Threading
+Imports Tmds.DBus.Protocol
 Partial Public Class MessageBox : Inherits Window
     Private WithEvents Window As Window
     Private WithEvents TitleBarLabel As Label
@@ -10,6 +12,7 @@ Partial Public Class MessageBox : Inherits Window
     Private WithEvents OkButton As CustomButton
     Public CurrentLanguageInt As Integer = 0
     Public CopyMessageToClipboardBusy As Boolean = False
+    Public ClipboardDebugContent As String = ""
 
     Sub New()
         InitializeComponent() ' This call is required by the designer
@@ -32,10 +35,23 @@ Partial Public Class MessageBox : Inherits Window
         OkButton = FindNameScope().Find("OkButton")
     End Sub
 
-    Sub ConfigureContent(Title As String, Message As String)
-        TitleBarLabel.Content = "    " & Title
+    Sub ConfigureContent(Title As String, Message As String, Optional ClipboardDebugContent As String = "")
+        If ClipboardDebugContent = "" Then
+            Me.ClipboardDebugContent = Message
+        Else
+            Me.ClipboardDebugContent = ClipboardDebugContent
+        End If
+        If Title.StartsWith("    ") Then
+            TitleBarLabel.Content = "    " & Title
+        Else
+            TitleBarLabel.Content = Title
+        End If
         MessageLabel.Text = Message
-        Select Case Message.Length
+        AutoAdjustMessageFontSize()
+    End Sub
+
+    Sub AutoAdjustMessageFontSize()
+        Select Case MessageLabel.Text.Length
             Case > 90
                 MessageLabel.FontSize = 15
             Case > 40
@@ -73,9 +89,14 @@ e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Meta)) Then
 
     Async Sub CopyMessageToClipboard()
         CopyMessageToClipboardBusy = True
-        Await Clipboard.SetTextAsync(MessageLabel.Text)
+        Await Clipboard.SetTextAsync(ClipboardDebugContent)
+        Dim OriginalMessageLabelText = MessageLabel.Text
+        MessageLabel.Text = ClipboardDebugContent
+        AutoAdjustMessageFontSize()
         MessageLabel.Background = Brushes.DarkGreen
         Await Task.Delay(500)
+        MessageLabel.Text = OriginalMessageLabelText
+        AutoAdjustMessageFontSize()
         MessageLabel.Background = Nothing
         CopyMessageToClipboardBusy = False
     End Sub

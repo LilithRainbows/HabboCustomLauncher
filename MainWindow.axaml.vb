@@ -1,3 +1,4 @@
+Imports System.ComponentModel
 Imports System.Globalization
 Imports System.IO
 Imports System.IO.Compression
@@ -8,6 +9,7 @@ Imports System.Runtime.InteropServices
 Imports System.Security.Principal
 Imports System.Text
 Imports System.Text.Json
+Imports System.Text.Json.Nodes
 Imports System.Threading
 Imports Avalonia
 Imports Avalonia.Controls
@@ -178,7 +180,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 23 (07/03/2026)"
+        FooterButton.Text = "CustomLauncher version 24 (07/03/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -242,7 +244,7 @@ Partial Public Class MainWindow : Inherits Window
             ChangeUpdateSourceButton2.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.LaunchClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
             Dim ErrorDialog As New MessageBox()
-            ErrorDialog.ConfigureContent("Error (CTRL + C to copy)", ex.ToString)
+            ErrorDialog.ConfigureContent(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientLaunchError(CurrentLanguageInt), ex.Message)
             ErrorDialog.ShowDialog(Window)
         End Try
     End Function
@@ -437,6 +439,9 @@ Partial Public Class MainWindow : Inherits Window
             End If
 
             File.WriteAllText(Path.Combine(ClientFolderPath, "VERSION.txt"), CurrentClientUrls.FlashWindowsVersion)
+            If UpdateSource = "AIR_Plus" = False Then
+                AddOrUpdateInstallation(CurrentClientUrls.FlashWindowsVersion, ClientFolderPath, "air", 0)
+            End If
 
             StartNewInstanceButton.IsButtonDisabled = False
             StartNewInstanceButton2.IsButtonDisabled = False
@@ -452,7 +457,7 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton.Text = AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt)
             'Clipboard.SetTextAsync(ex.ToString)
             Dim ErrorDialog As New MessageBox()
-            ErrorDialog.ConfigureContent("Error (CTRL + C to copy)", ex.ToString)
+            ErrorDialog.ConfigureContent(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientUpdateError(CurrentLanguageInt), ex.Message)
             ErrorDialog.ShowDialog(Window)
         End Try
     End Function
@@ -645,7 +650,7 @@ Partial Public Class MainWindow : Inherits Window
                 ClientVersion = CurrentClientUrls.FlashWindowsVersion
             End If
             Dim ClientPath = GetPossibleClientPath(ClientVersion)
-            Return Directory.Exists(ClientPath) AndAlso File.Exists(Path.Combine(ClientPath, "VERSION.txt"))
+            Return Directory.Exists(ClientPath) AndAlso (File.Exists(Path.Combine(ClientPath, "VERSION.txt")) OrElse InstallationExists(ClientVersion, "air"))
         Catch
             Return False
         End Try
@@ -676,9 +681,12 @@ Partial Public Class MainWindow : Inherits Window
                 StartNewInstanceButton.Text = AppTranslator.UpdateClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
             End If
 
-        Catch
+        Catch ex As Exception
             'StartNewInstanceButton.BackColor = Media.Color.FromRgb(200, 0, 0)
             StartNewInstanceButton.Text = AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt)
+            Dim ErrorDialog As New MessageBox()
+            ErrorDialog.ConfigureContent(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientUpdatesCheckError(CurrentLanguageInt), ex.Message)
+            ErrorDialog.ShowDialog(Window)
         End Try
         StartNewInstanceButton.IsButtonDisabled = False
         StartNewInstanceButton2.IsButtonDisabled = False
@@ -690,14 +698,14 @@ Partial Public Class MainWindow : Inherits Window
         Dim AppDataFolderPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
         If String.IsNullOrWhiteSpace(AppDataFolderPath) Then
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
-                AppDataFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config")
+                AppDataFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Application Support")
             ElseIf RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
                 AppDataFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "AppData", "Roaming")
             Else
                 AppDataFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config")
             End If
-            Directory.CreateDirectory(AppDataFolderPath)
         End If
+        Directory.CreateDirectory(AppDataFolderPath)
         Return AppDataFolderPath
     End Function
 
@@ -814,6 +822,7 @@ Partial Public Class MainWindow : Inherits Window
         '(Por ejemplo usar una version especifica ya descargada del cliente, borrar instalacion existente, borrar todas instalaciones, etc.)
         Try
             Directory.Delete(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), True)
+            RemoveInstallation(CurrentClientUrls.FlashWindowsVersion, "air")
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
             ChangeUpdateSourceButton.IsButtonDisabled = True
@@ -822,7 +831,7 @@ Partial Public Class MainWindow : Inherits Window
             UpdateClientButtonStatus()
         Catch ex As Exception
             Dim ErrorDialog As New MessageBox()
-            ErrorDialog.ConfigureContent("Error", AppTranslator.ClientDeleteError(CurrentLanguageInt))
+            ErrorDialog.ConfigureContent(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientDeleteError(CurrentLanguageInt), ex.Message)
             ErrorDialog.ShowDialog(Window)
         End Try
     End Sub
@@ -1195,6 +1204,113 @@ Partial Public Class MainWindow : Inherits Window
         End If
     End Sub
 
+    Public Sub AddOrUpdateInstallation(version As String, path As String, client As String, lastModified As Long)
+        Dim jsonPath = IO.Path.Combine(GetAppDataPath, "Habbo Launcher", "versions.json")
+        Dim root As JsonObject
+
+        Try
+            If File.Exists(jsonPath) Then
+                Dim txt = File.ReadAllText(jsonPath)
+                If Not String.IsNullOrWhiteSpace(txt) Then
+                    root = JsonNode.Parse(txt).AsObject()
+                Else
+                    root = New JsonObject()
+                End If
+            Else
+                root = New JsonObject()
+            End If
+        Catch
+            root = New JsonObject()
+        End Try
+
+        If root("installations") Is Nothing Then
+            root("installations") = New JsonArray()
+        End If
+
+        Dim installations As JsonArray = root("installations")
+
+        Dim existing As JsonObject = Nothing
+
+        For Each item As JsonObject In installations
+            If item("version")?.ToString() = version AndAlso item("client")?.ToString() = client Then
+                existing = item
+                Exit For
+            End If
+        Next
+
+        If existing IsNot Nothing Then
+            existing("path") = path
+            existing("lastModified") = lastModified
+        Else
+            installations.Add(New JsonObject From {
+                {"version", version},
+                {"path", path},
+                {"client", client},
+                {"lastModified", lastModified}
+            })
+        End If
+
+        Dim dir = IO.Path.GetDirectoryName(jsonPath)
+        If Not String.IsNullOrWhiteSpace(dir) AndAlso Not Directory.Exists(dir) Then
+            Directory.CreateDirectory(dir)
+        End If
+
+        File.WriteAllText(jsonPath, root.ToJsonString(New JsonSerializerOptions With {.WriteIndented = True}))
+
+    End Sub
+
+    Public Sub RemoveInstallation(version As String, client As String)
+        Dim jsonPath = IO.Path.Combine(GetAppDataPath, "Habbo Launcher", "versions.json")
+        If Not File.Exists(jsonPath) Then Exit Sub
+
+        Dim root As JsonObject
+
+        Try
+            Dim txt = File.ReadAllText(jsonPath)
+            If String.IsNullOrWhiteSpace(txt) Then Exit Sub
+            root = JsonNode.Parse(txt).AsObject()
+        Catch
+            Exit Sub
+        End Try
+
+        Dim installations As JsonArray = root("installations")
+        If installations Is Nothing Then Exit Sub
+
+        For i As Integer = installations.Count - 1 To 0 Step -1
+            Dim item As JsonObject = installations(i)
+            If item("version")?.ToString() = version AndAlso item("client")?.ToString() = client Then
+                installations.RemoveAt(i)
+            End If
+        Next
+
+        File.WriteAllText(jsonPath, root.ToJsonString(New JsonSerializerOptions With {.WriteIndented = True}))
+
+    End Sub
+
+    Public Function InstallationExists(version As String, client As String) As Boolean
+        Dim jsonPath = IO.Path.Combine(GetAppDataPath, "Habbo Launcher", "versions.json")
+        If Not File.Exists(jsonPath) Then Return False
+
+        Try
+            Dim txt = File.ReadAllText(jsonPath)
+            If String.IsNullOrWhiteSpace(txt) Then Return False
+
+            Dim root = JsonNode.Parse(txt).AsObject()
+            Dim installations As JsonArray = root("installations")
+
+            If installations Is Nothing Then Return False
+
+            For Each item As JsonObject In installations
+                If item("version")?.ToString() = version AndAlso item("client")?.ToString() = client Then
+                    Return True
+                End If
+            Next
+        Catch
+        End Try
+
+        Return False
+
+    End Function
 End Class
 
 Public Class JsonClientUrls
@@ -1355,9 +1471,25 @@ Public Class AppTranslator
         "Automatic habbo protocol",
         "Habbo protocol automatico"
     }
+    Public Shared ClientLaunchError As String() = {
+        "Client could not be launched!",
+        "No se pudo ejecutar el cliente!"
+    }
+    Public Shared ClientUpdateError As String() = {
+        "Client could not be updated!",
+        "No se pudo actualizar el cliente!"
+    }
     Public Shared ClientDeleteError As String() = {
         "Client version could not be deleted!",
         "No se pudo eliminar la version del cliente!"
+    }
+    Public Shared ClientUpdatesCheckError As String() = {
+        "Client updates could not be checked!",
+        "No se pudo comprobar las actualizaciones del cliente!"
+    }
+    Public Shared ErrorDebugClipboardHint As String() = {
+        "Error (CTRL + C to copy technical details)",
+        "Error (CTRL + C para copiar detalles tecnicos)"
     }
     Public Shared ClassicAirClientHint As String() = {
         "The official classic Habbo client without modifications.",
