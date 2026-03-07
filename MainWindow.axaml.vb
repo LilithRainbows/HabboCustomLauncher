@@ -11,13 +11,11 @@ Imports System.Text.Json
 Imports System.Threading
 Imports Avalonia
 Imports Avalonia.Controls
-Imports Avalonia.Input.Platform
 Imports Avalonia.Interactivity
 Imports Avalonia.Markup.Xaml
 Imports Avalonia.Media
 Imports Avalonia.Media.Imaging
 Imports Avalonia.Platform
-Imports Avalonia.VisualTree
 Imports Microsoft.Win32
 Imports WindowsShortcutFactory
 
@@ -180,7 +178,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 22 (06/03/2026)"
+        FooterButton.Text = "CustomLauncher version 23 (07/03/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -237,12 +235,15 @@ Partial Public Class MainWindow : Inherits Window
             ClientProcess.StartInfo.Arguments = "-server " & CurrentLoginCode.ServerId & " -ticket " & CurrentLoginCode.SSOTicket
             Await Task.Run(Sub() ClientProcess.Start())
             Await Clipboard.SetTextAsync("")
-        Catch
+        Catch ex As Exception
             StartNewInstanceButton.IsButtonDisabled = False
             StartNewInstanceButton2.IsButtonDisabled = False
             ChangeUpdateSourceButton.IsButtonDisabled = False
             ChangeUpdateSourceButton2.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.LaunchClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
+            Dim ErrorDialog As New MessageBox()
+            ErrorDialog.ConfigureContent("Error (CTRL + C to copy)", ex.ToString)
+            ErrorDialog.ShowDialog(Window)
         End Try
     End Function
 
@@ -256,14 +257,14 @@ Partial Public Class MainWindow : Inherits Window
         process.WaitForExit()
     End Function
 
-    Sub CodesignDeepForceOSX(filePath As String)
-        Dim process As New Process()
-        process.StartInfo.FileName = "/usr/bin/codesign"
-        process.StartInfo.Arguments = $"--force --deep --sign - ""{filePath}"""
-        process.StartInfo.UseShellExecute = False
-        process.StartInfo.CreateNoWindow = True
-        process.Start()
-        process.WaitForExit()
+    Sub CodesignFile(filePath As String)
+        Dim p As New Process()
+        p.StartInfo.FileName = "/usr/bin/codesign"
+        p.StartInfo.Arguments = $"--force --timestamp=none --sign - ""{filePath}"""
+        p.StartInfo.UseShellExecute = False
+        p.StartInfo.CreateNoWindow = True
+        p.Start()
+        p.WaitForExit()
     End Sub
 
     Public Sub UnzipFile(sourcezip As String, destinationfolder As String, overwrite As Boolean, Optional itemsToSkip As List(Of String) = Nothing, Optional IgnoreIOExceptions As Boolean = False)
@@ -403,8 +404,27 @@ Partial Public Class MainWindow : Inherits Window
 
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
                 FixOSXClientStructure()
-                MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"))
-                CodesignDeepForceOSX(Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"))
+                Dim ExecutableFiles As New List(Of String) From {
+                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Frameworks", "DiscordRichPresence.framework", "Versions", "A", "DiscordRichPresence"),
+                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Frameworks", "Adobe AIR.framework", "Versions", "1.0", "Adobe AIR"),
+                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo")
+                }
+                For Each ExecutableFile In ExecutableFiles
+                    If File.Exists(ExecutableFile) Then
+                        MakeUnixExecutable(ExecutableFile)
+                    End If
+                Next
+                Dim CodesignFilesOrDirectories As New List(Of String) From {
+                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Frameworks", "DiscordRichPresence.framework"),
+                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Frameworks", "Adobe AIR.framework"),
+                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"),
+                    Path.Combine(ClientFolderPath, "Habbo.app")
+                }
+                For Each CodesignFileOrDirectory In CodesignFilesOrDirectories
+                    If File.Exists(CodesignFileOrDirectory) OrElse Directory.Exists(CodesignFileOrDirectory) Then
+                        CodesignFile(CodesignFileOrDirectory)
+                    End If
+                Next
             ElseIf RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False Then
                 MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo")) 'Linux
             End If
