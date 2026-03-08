@@ -42,9 +42,9 @@ Partial Public Class MessageBox : Inherits Window
             Me.ClipboardDebugContent = ClipboardDebugContent
         End If
         If Title.StartsWith("    ") Then
-            TitleBarLabel.Content = "    " & Title
-        Else
             TitleBarLabel.Content = Title
+        Else
+            TitleBarLabel.Content = "    " & Title
         End If
         MessageLabel.Text = Message
         AutoAdjustMessageFontSize()
