@@ -180,7 +180,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 24 (07/03/2026)"
+        FooterButton.Text = "CustomLauncher version 25 (17/03/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -695,7 +695,7 @@ Partial Public Class MainWindow : Inherits Window
     End Function
 
     Public Function GetAppDataPath() As String
-        Dim AppDataFolderPath As String = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+        Dim AppDataFolderPath As String = "" 'Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
         If String.IsNullOrWhiteSpace(AppDataFolderPath) Then
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
                 AppDataFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Application Support")

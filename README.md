@@ -1,7 +1,6 @@
 # HabboCustomLauncher
-### WARNING: <br> The project is temporarily outdated, but it will be back soon!
 
-<img width="482" alt="image" src="https://github.com/user-attachments/assets/bdab6a02-86f5-4f39-8c87-48ce75ecca06" />
+<img width="482" alt="image" src="https://github.com/user-attachments/assets/73dc4578-70d7-42bb-97ed-7d3fdc2e8fce" />
 <br><br>
 
 | OS                  | Classic client | App shortcut | App protocol |
