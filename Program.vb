@@ -1,12 +1,8 @@
-Imports System.IO
-Imports System.IO.Pipes
 Imports System.Reflection
 Imports System.Runtime.InteropServices
 Imports System.Threading
 Imports Avalonia
-Imports Avalonia.Controls
 Imports Avalonia.Media
-
 
 Module Program
     Private appMutex As Mutex
@@ -14,22 +10,14 @@ Module Program
     <STAThread>
     Sub Main(args As String())
         Try
+
             Dim mutexName As String = "HabboCustomLauncherBeta"
             Dim isNewInstance As Boolean
             appMutex = New Mutex(True, mutexName, isNewInstance)
             If Not isNewInstance Then
-                For Each Argument In Environment.GetCommandLineArgs()
-                    If Argument.StartsWith("habbo://") Then
-                        Argument = Argument.Remove(0, Argument.IndexOf("?server=") + 8)
-                        Argument = Argument.Replace("&token=", ".")
-                        SendLoginTicketToMainInstance(Argument)
-                        Return
-                    End If
-                Next
-                SendLoginTicketToMainInstance("main")
-                Return
+                args = New String() {"already_running"}
             End If
-            StartAvaloniaApp(Function() New MainWindow(), args)
+            StartAvaloniaApp(args)
         Catch
             'App startup error
         End Try
@@ -41,7 +29,7 @@ Module Program
         Environment.Exit(0)
     End Sub
 
-    Private Sub StartAvaloniaApp(NewWindow As Func(Of Window), NewWindowArgs As String())
+    Private Sub StartAvaloniaApp(NewWindowArgs As String())
         Dim AvaloniaApp = BuildAvaloniaApp()
         Dim osVersion = Environment.OSVersion.Version
         If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) AndAlso osVersion.Major = 6 AndAlso osVersion.Minor = 1 Then 'Usando Windows 7 se define renderizado por software debido a que el usuario probablemente tenga una gpu demasiado antigua para soportar opengl de forma adecuada (gma3600 por ejemplo da problemas)
@@ -51,21 +39,7 @@ Module Program
                 }
             AvaloniaApp.With(Win32Options)
         End If
-        AvaloniaApp.Start(Sub(app As Application, args As String()) app.Run(NewWindow()), NewWindowArgs)
-    End Sub
-
-    Private Sub SendLoginTicketToMainInstance(LoginTicket As String)
-        Try
-            Using pipeClient As New NamedPipeClientStream(".", "HabboCustomLauncherBeta", PipeDirection.Out)
-                pipeClient.Connect(1000)
-                Using writer As New StreamWriter(pipeClient)
-                    writer.WriteLine(LoginTicket)
-                    writer.Flush()
-                End Using
-            End Using
-        Catch ex As Exception
-            Console.WriteLine("Error while sending login ticket to main instance: " & ex.Message)
-        End Try
+        AvaloniaApp.StartWithClassicDesktopLifetime(NewWindowArgs)
     End Sub
 
     Public Function BuildAvaloniaApp() As AppBuilder

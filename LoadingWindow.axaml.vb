@@ -1,17 +1,11 @@
-Imports System.IO
 Imports System.Runtime.InteropServices
-Imports System.Security.Cryptography
-Imports Avalonia
 Imports Avalonia.Controls
-Imports Avalonia.Controls.ApplicationLifetimes
-Imports Avalonia.Controls.Primitives.PopupPositioning
 Imports Avalonia.Input
 Imports Avalonia.Markup.Xaml
-Imports Avalonia.Media
-Imports Avalonia.Threading
 Imports Path = System.IO.Path
 
 Partial Public Class LoadingWindow : Inherits Window
+    Public MainMenuRequested As Boolean
     Private WithEvents Window As Window
     Private WithEvents TitleBarLabel As Label
     Public WithEvents StatusLabel As TextBlock
@@ -39,6 +33,8 @@ Partial Public Class LoadingWindow : Inherits Window
         StatusLabel = FindNameScope().Find("StatusLabel")
         CloseButton = FindNameScope().Find("CloseButton")
         MainMenuButton = FindNameScope().Find("MainMenuButton")
+
+        MainMenuRequested = False
 
         MainMenuButton.Text = LauncherUpdaterTranslator.ReturnToMainMenu(CurrentLanguageInt)
 
@@ -211,13 +207,11 @@ $")"
     End Sub
 
     Private Function GetMainWindow() As MainWindow
-        Dim lifetime = TryCast(Application.Current.ApplicationLifetime, IClassicDesktopStyleApplicationLifetime)
-        Dim mainWindow = lifetime.MainWindow
-        Return mainWindow
+        Return Singleton.GetCurrentInstance.MainWindow
     End Function
 
     Private Sub MainMenuButton_Click(sender As Object, e As EventArgs) Handles MainMenuButton.Click
-        GetMainWindow.LoadingWindowCloseRequested = True
+        MainMenuRequested = True
         Window.Close()
     End Sub
 
@@ -226,6 +220,15 @@ $")"
         If e.GetCurrentPoint(TitleBarLabel).Properties.IsLeftButtonPressed Then
             ' Avalonia se encarga de DPI y límites automáticamente
             Me.BeginMoveDrag(e)
+        End If
+    End Sub
+
+    Private Sub LoadingWindow_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
+        If MainMenuRequested Then
+            GetMainWindow.Show()
+            GetMainWindow.LoadingWindowChild = Nothing
+        Else
+            Process.GetCurrentProcess.Kill()
         End If
     End Sub
 End Class

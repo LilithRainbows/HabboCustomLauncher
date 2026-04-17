@@ -1,8 +1,6 @@
-Imports System.ComponentModel
 Imports System.Globalization
 Imports System.IO
 Imports System.IO.Compression
-Imports System.IO.Pipes
 Imports System.Net.Http
 Imports System.Reflection
 Imports System.Runtime.InteropServices
@@ -10,7 +8,6 @@ Imports System.Security.Principal
 Imports System.Text
 Imports System.Text.Json
 Imports System.Text.Json.Nodes
-Imports System.Threading
 Imports Avalonia
 Imports Avalonia.Controls
 Imports Avalonia.Interactivity
@@ -25,7 +22,7 @@ Imports WindowsShortcutFactory
 'SOLUCION: Al hacer click al boton se pregunta para introducir manualmente el codigo (aunque seria innecesario), mejor preguntar que hotel lanzar directamente? o tambien es innecesario? si todo es innecesario capaz convenga hacer que deje de ser un boton y pase a ser un label
 
 Partial Public Class MainWindow : Inherits Window
-    Private WithEvents LoadingWindowChild As LoadingWindow
+    Public WithEvents LoadingWindowChild As LoadingWindow
     Private LoadingWindowClientLaunchRequested As Boolean = False
     Private WithEvents Window As Window
     Private WithEvents TitleBarLabel As Label
@@ -45,53 +42,12 @@ Partial Public Class MainWindow : Inherits Window
     Public UpdateSource As String = "AIR_Plus"
     Public CurrentLanguageInt As Integer = 0
     Private ReadOnly HttpClient As New HttpClient()
-    Private NamedPipeCancellationTokenSource As CancellationTokenSource
     Public UnixPatchName As String = "HabboAirLinuxPatch_x64.zip" 'Depending on the platform, it can automatically become HabboAirLinuxPatch_x64.zip and HabboAirOSXPatch.zip
     Public WindowsPatchName As String = "HabboAirWindowsPatch_x86.zip" 'Depending on the architecture, it can automatically become HabboAirWindowsPatch_x64.zip
     Public AirPlusPatchName As String = "HabboAirPlusPatch.zip"
     Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
     Public AirPlusClientURL = "https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf"
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
-    Public Shared LoadingWindowCloseRequested As Boolean = False 'If LoadingWindow.close() is invoked while this variable is false, then MainWindow.close() will be invoked
-
-    Public Async Sub StartPipedLoginTicketListener()
-        Try
-            If NamedPipeCancellationTokenSource Is Nothing Then
-                NamedPipeCancellationTokenSource = New CancellationTokenSource()
-                While Not NamedPipeCancellationTokenSource.Token.IsCancellationRequested
-                    Using pipeServer As New NamedPipeServerStream("HabboCustomLauncherBeta", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous)
-                        Await pipeServer.WaitForConnectionAsync(NamedPipeCancellationTokenSource.Token)
-                        Using reader As New StreamReader(pipeServer)
-                            Dim arguments As String = Await reader.ReadLineAsync()
-                            If arguments IsNot Nothing Then
-                                If Window.IsActive = False And LoadingWindowChild Is Nothing Then
-                                    Await EnsureWindowFocus(Window)
-                                End If
-                                If arguments = "main" = False Then
-                                    Await Clipboard.SetTextAsync(arguments)
-                                    Await CheckClipboardLoginCodeAsync()
-                                End If
-                            End If
-                        End Using
-                    End Using
-                End While
-            End If
-        Catch
-            'Console.WriteLine("PipeServer error!")
-        End Try
-        StopPipedLoginTicketListener()
-    End Sub
-
-    Public Sub StopPipedLoginTicketListener()
-        Try
-            If NamedPipeCancellationTokenSource IsNot Nothing Then
-                NamedPipeCancellationTokenSource.Cancel()
-                NamedPipeCancellationTokenSource.Dispose()
-                NamedPipeCancellationTokenSource = Nothing
-            End If
-        Catch
-        End Try
-    End Sub
 
     Sub New()
         ' This call is required by the designer
@@ -121,13 +77,13 @@ Partial Public Class MainWindow : Inherits Window
         SulakeButton = Window.FindNameScope.Find("SulakeButton")
         FooterButton = Window.FindNameScope.Find("FooterButton")
 
+        Singleton.GetCurrentInstance().MainWindow = Me
+
         LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeNotDetected(CurrentLanguageInt)
         StartNewInstanceButton.Text = AppTranslator.UnknownClientVersion(CurrentLanguageInt)
 
-        StartPipedLoginTicketListener()
         DisplayLauncherVersionOnFooter()
         RefreshUpdateSourceText()
-        StartRecursiveClipboardLoginCodeCheckAsync()
         FixWindowsTLS()
         RegisterHabboProtocol()
 
@@ -147,23 +103,16 @@ Partial Public Class MainWindow : Inherits Window
 
         LoadSavedUpdateSource()
 
-        For Each Argument In Environment.GetCommandLineArgs()
-            If Argument.StartsWith("habbo://") Then
-
-                LoadingWindowCloseRequested = False
-                LoadingWindowChild = New LoadingWindow()
-                LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) & " ..." 'Generic loading
-
-                ToggleWindowVisibility(Window, False)
-
-                EnsureWindowFocus(LoadingWindowChild)
-
-                Argument = Argument.Remove(0, Argument.IndexOf("?server=") + 8)
-                Argument = Argument.Replace("&token=", ".")
-                CopyToClipboard(Argument) 'Clipboard.SetTextAsync(Argument).Wait()
-                CheckClipboardLoginCodeAsync()
-            End If
-        Next
+        Dim HabboProtocol = Environment.GetCommandLineArgs().FirstOrDefault(Function(x) x.StartsWith("habbo://"), "")
+        If HabboProtocol = "" Then
+            Window.Show()
+        Else
+            LoadingWindowChild = New LoadingWindow()
+            LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) & " ..." 'Generic loading
+            LoadingWindowChild.Show()
+            CopyToClipboard(HabboProtocol).Wait()
+        End If
+        StartRecursiveClipboardLoginCodeCheckAsync()
     End Sub
 
     Public Function GetAirPatchNameForCurrentOS() As String
@@ -174,13 +123,18 @@ Partial Public Class MainWindow : Inherits Window
         End If
     End Function
 
-    Public Async Sub CopyToClipboard(Argument As String)
-        Await Clipboard.SetTextAsync(Argument)
-    End Sub
+    Public Async Function CopyToClipboard(Argument As String) As Task(Of Boolean)
+        Try
+            Await Clipboard.SetTextAsync(Argument)
+        Catch ex As Exception
+            Return False
+        End Try
+        Return True
+    End Function
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 25 (17/03/2026)"
+        FooterButton.Text = "CustomLauncher version 26 (17/04/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -236,17 +190,25 @@ Partial Public Class MainWindow : Inherits Window
             End If
             ClientProcess.StartInfo.Arguments = "-server " & CurrentLoginCode.ServerId & " -ticket " & CurrentLoginCode.SSOTicket
             Await Task.Run(Sub() ClientProcess.Start())
-            Await Clipboard.SetTextAsync("")
+            CurrentLoginCode = Nothing
         Catch ex As Exception
             StartNewInstanceButton.IsButtonDisabled = False
             StartNewInstanceButton2.IsButtonDisabled = False
             ChangeUpdateSourceButton.IsButtonDisabled = False
             ChangeUpdateSourceButton2.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.LaunchClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
-            Dim ErrorDialog As New MessageBox()
-            ErrorDialog.ConfigureContent(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientLaunchError(CurrentLanguageInt), ex.Message)
-            ErrorDialog.ShowDialog(Window)
+            MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientLaunchError(CurrentLanguageInt), ex.Message)
         End Try
+    End Function
+
+    Public Async Function MsgBox(Title As String, Message As String, Optional ClipboardDebugContent As String = "") As Task(Of Boolean)
+        Dim ErrorDialog As New MessageBox()
+        ErrorDialog.ConfigureContent(Title, Message, ClipboardDebugContent)
+        Do While Window.IsVisible = False
+            Await Task.Delay(100)
+        Loop
+        Await ErrorDialog.ShowDialog(Window)
+        Return True
     End Function
 
     Function MakeUnixExecutable(ByVal filePath As String) As Boolean
@@ -456,9 +418,7 @@ Partial Public Class MainWindow : Inherits Window
             ChangeUpdateSourceButton2.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt)
             'Clipboard.SetTextAsync(ex.ToString)
-            Dim ErrorDialog As New MessageBox()
-            ErrorDialog.ConfigureContent(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientUpdateError(CurrentLanguageInt), ex.Message)
-            ErrorDialog.ShowDialog(Window)
+            MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientUpdateError(CurrentLanguageInt), ex.Message)
         End Try
     End Function
 
@@ -569,15 +529,35 @@ Partial Public Class MainWindow : Inherits Window
     End Function
 
     Private Async Sub StartRecursiveClipboardLoginCodeCheckAsync()
+        Await CheckClipboardLoginCodeAsync()
         Do While True
             Await Task.Delay(500)
             Await CheckClipboardLoginCodeAsync()
         Loop
     End Sub
 
+
+    Public Async Function EnsureCurrentWindowFocus() As Task(Of Boolean)
+        If LoadingWindowChild Is Nothing And Window.IsActive = False Then
+            Await EnsureWindowFocus(Me)
+        End If
+        If LoadingWindowChild IsNot Nothing AndAlso LoadingWindowChild.IsActive = False Then
+            Await EnsureWindowFocus(LoadingWindowChild)
+        End If
+        Return True
+    End Function
+
     Private Async Function CheckClipboardLoginCodeAsync() As Task(Of Boolean)
         Try
+
             Dim ClipboardText = Await Clipboard.GetTextAsync()
+
+
+            If ClipboardText.StartsWith("hcl_main_focus_") Then
+                ClipboardText = ClipboardText.Replace("hcl_main_focus_", "")
+                Await EnsureCurrentWindowFocus()
+                Await CopyToClipboard(ClipboardText)
+            End If
             Dim ClipboardLoginCode As New LoginCode(ClipboardText)
             If String.IsNullOrWhiteSpace(ClipboardLoginCode.ServerUrl) Then
                 Throw New Exception("Invalid clipboard login code")
@@ -587,18 +567,20 @@ Partial Public Class MainWindow : Inherits Window
                     OldLoginTicket = CurrentLoginCode.SSOTicket
                 End If
                 CurrentLoginCode = ClipboardLoginCode
+                Await CopyToClipboard("")
                 LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeDetected(CurrentLanguageInt) & " [" & ClipboardLoginCode.ServerId.Replace("hh", "").ToUpper & "]"
                 If OldLoginTicket = ClipboardLoginCode.SSOTicket = False Then
-                    If Window.IsActive = False And LoadingWindowChild Is Nothing Then
-                        Await EnsureWindowFocus(Window)
-                    End If
+                    Await EnsureCurrentWindowFocus()
                     DisplayCurrentUserOnFooter()
                     Await UpdateClientButtonStatus()
                     Return True
                 End If
                 'Await Application.Current.Clipboard.SetTextAsync("ServerId: " & LoginCode.ServerId & " - ServerUrl: " & LoginCode.ServerUrl & " - SSOTicket: " & LoginCode.SSOTicket)
             End If
-        Catch
+        Catch ex As Exception
+            If CurrentLoginCode IsNot Nothing Then
+                Return False 'Ignore invalid clipboard login codes if there is already a valid login code
+            End If
             CurrentLoginCode = Nothing
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
@@ -684,9 +666,7 @@ Partial Public Class MainWindow : Inherits Window
         Catch ex As Exception
             'StartNewInstanceButton.BackColor = Media.Color.FromRgb(200, 0, 0)
             StartNewInstanceButton.Text = AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt)
-            Dim ErrorDialog As New MessageBox()
-            ErrorDialog.ConfigureContent(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientUpdatesCheckError(CurrentLanguageInt), ex.Message)
-            ErrorDialog.ShowDialog(Window)
+            MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientUpdatesCheckError(CurrentLanguageInt), ex.Message)
         End Try
         StartNewInstanceButton.IsButtonDisabled = False
         StartNewInstanceButton2.IsButtonDisabled = False
@@ -748,6 +728,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Sub LoginCodeButton_Click(sender As Object, e As EventArgs) Handles LoginCodeButton.Click
         If LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeNotDetected(CurrentLanguageInt) = False Then
+            CurrentLoginCode = Nothing
             Return
         End If
         Dim HabboAvatarSettingsUrl As String = "https://www.habbo.com/settings/avatars"
@@ -830,9 +811,7 @@ Partial Public Class MainWindow : Inherits Window
             FocusManager.ClearFocus()
             UpdateClientButtonStatus()
         Catch ex As Exception
-            Dim ErrorDialog As New MessageBox()
-            ErrorDialog.ConfigureContent(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientDeleteError(CurrentLanguageInt), ex.Message)
-            ErrorDialog.ShowDialog(Window)
+            MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientDeleteError(CurrentLanguageInt), ex.Message)
         End Try
     End Sub
 
@@ -978,12 +957,7 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Private Sub MainWindow_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
-        Try
-            If NamedPipeCancellationTokenSource.IsCancellationRequested = False Then
-                StopPipedLoginTicketListener()
-            End If
-        Catch
-        End Try
+        Process.GetCurrentProcess.Kill()
     End Sub
 
     Private Sub HabboLogoButton_ContextMenuClosed(sender As Object, e As EventArgs)
@@ -1117,27 +1091,13 @@ Partial Public Class MainWindow : Inherits Window
     Private Async Function EnsureWindowFocus(RequestedWindow As Window) As Task(Of Boolean)
         Try
             RequestedWindow.Show() 'Quizas convendria hacer un ShowDialog(Window) especificamente para el LoadingWindow pero luego queda abierto en el background, reformar codigo! Quizas usando luego Window.Owner desde el LoadingWindow
-            RequestedWindow.WindowState = WindowState.Minimized
-            Await Task.Delay(100)
-            RequestedWindow.WindowState = WindowState.Normal
-            RequestedWindow.Activate()
-            Return True
-        Catch ex As Exception
-            Return False
-        End Try
-    End Function
-
-    Private Function ToggleWindowVisibility(RequestedWindow As Window, IsVisible As Boolean) As Boolean
-        Try
-            RequestedWindow.IsEnabled = IsVisible
-            RequestedWindow.ShowInTaskbar = IsVisible
-            If IsVisible Then
-                RequestedWindow.Opacity = 1
-                RequestedWindow.WindowState = WindowState.Normal
-            Else
-                RequestedWindow.Opacity = 0
+            If RequestedWindow.IsActive = False Then
                 RequestedWindow.WindowState = WindowState.Minimized
+                Await Task.Delay(100)
+                RequestedWindow.WindowState = WindowState.Normal
+                RequestedWindow.Activate()
             End If
+            Return True
         Catch ex As Exception
             Return False
         End Try
@@ -1147,10 +1107,8 @@ Partial Public Class MainWindow : Inherits Window
         If e.Property.Name = "Text" Then
             If LoadingWindowChild IsNot Nothing Then
                 If StartNewInstanceButton.Text.StartsWith(AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt)) Then 'Update fail
-                    LoadingWindowCloseRequested = True
+                    LoadingWindowChild.MainMenuRequested = True
                     LoadingWindowChild.Close()
-                    LoadingWindowChild = Nothing
-                    ToggleWindowVisibility(Window, True)
                     Return
                 End If
                 If StartNewInstanceButton.Text.StartsWith(AppTranslator.LaunchClientVersion(CurrentLanguageInt)) Then 'Launch client
@@ -1160,7 +1118,6 @@ Partial Public Class MainWindow : Inherits Window
                     Return
                 End If
                 If StartNewInstanceButton.Text.StartsWith(AppTranslator.UnknownClientVersion(CurrentLanguageInt)) AndAlso LoadingWindowClientLaunchRequested = True Then 'Client launched
-                    LoadingWindowClientLaunchRequested = False
                     Process.GetCurrentProcess.Kill()
                     Return
                 End If
@@ -1190,12 +1147,12 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Private Sub LoadingWindowChild_Closed(sender As Object, e As EventArgs) Handles LoadingWindowChild.Closed
-        If LoadingWindowCloseRequested = True Then
-            LoadingWindowChild = Nothing
-            ToggleWindowVisibility(Window, True)
-        Else
-            Window.Close()
-        End If
+        'If LoadingWindowCloseRequested = True Then
+        '    LoadingWindowChild = Nothing
+        '    EnsureWindowFocus(Me)
+        'Else
+        '    Window.Close()
+        'End If
     End Sub
 
     Private Sub MainWindow_Activated(sender As Object, e As EventArgs) Handles Me.Activated
@@ -1311,6 +1268,7 @@ Partial Public Class MainWindow : Inherits Window
         Return False
 
     End Function
+
 End Class
 
 Public Class JsonClientUrls
@@ -1332,6 +1290,10 @@ Public Class LoginCode
     Public ReadOnly Username As String = ""
 
     Public Sub New(LoginCode As String)
+        If LoginCode.StartsWith("habbo://") And LoginCode.Contains("server=") Then 'Example: habbo://hab?server=hhes&token=11111111-1111-1111-1111-111111111111-11111111.V4.LilithRainbows
+            LoginCode = LoginCode.Remove(0, LoginCode.IndexOf("?server=") + 8)
+            LoginCode = LoginCode.Replace("&token=", ".")
+        End If
         If CheckLoginCode(LoginCode) Then
             Dim LoginServerId As String = LoginCode.Split(".")(0) 'Example: hhes
             Dim LoginTicket As String = LoginCode.Split(".")(1) & "." & LoginCode.Split(".")(2) 'Example: 11111111-1111-1111-1111-111111111111-11111111.V4
