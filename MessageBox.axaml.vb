@@ -33,6 +33,7 @@ Partial Public Class MessageBox : Inherits Window
         MessageLabel = FindNameScope().Find("MessageLabel")
         CloseButton = FindNameScope().Find("CloseButton")
         OkButton = FindNameScope().Find("OkButton")
+        Singleton.GetCurrentInstance().ScaleMainGrid(Window)
     End Sub
 
     Sub ConfigureContent(Title As String, Message As String, Optional ClipboardDebugContent As String = "")

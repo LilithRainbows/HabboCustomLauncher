@@ -77,6 +77,7 @@ Partial Public Class MainWindow : Inherits Window
         SulakeButton = Window.FindNameScope.Find("SulakeButton")
         FooterButton = Window.FindNameScope.Find("FooterButton")
 
+        Singleton.GetCurrentInstance().ScaleMainGrid(Window)
         Singleton.GetCurrentInstance().MainWindow = Me
 
         LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeNotDetected(CurrentLanguageInt)
@@ -134,7 +135,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 26 (17/04/2026)"
+        FooterButton.Text = "CustomLauncher version 27 (17/04/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String

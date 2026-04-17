@@ -34,6 +34,8 @@ Partial Public Class LoadingWindow : Inherits Window
         CloseButton = FindNameScope().Find("CloseButton")
         MainMenuButton = FindNameScope().Find("MainMenuButton")
 
+        Singleton.GetCurrentInstance().ScaleMainGrid(Window)
+
         MainMenuRequested = False
 
         MainMenuButton.Text = LauncherUpdaterTranslator.ReturnToMainMenu(CurrentLanguageInt)

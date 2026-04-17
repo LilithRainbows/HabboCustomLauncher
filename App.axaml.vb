@@ -1,9 +1,10 @@
+Imports System.Globalization
 Imports Avalonia
 Imports Avalonia.Controls
 Imports Avalonia.Controls.ApplicationLifetimes
 Imports Avalonia.Markup.Xaml
 
-Public Partial Class App
+Partial Public Class App
     Inherits Application
 
     Public Overrides Sub Initialize()
@@ -15,6 +16,14 @@ Public Partial Class App
         desktop = TryCast(ApplicationLifetime, IClassicDesktopStyleApplicationLifetime)
         If desktop IsNot Nothing Then
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown
+
+            Dim CustomWindowScale = Environment.GetCommandLineArgs().FirstOrDefault(Function(x) x.StartsWith("-scale="), 0)
+            CustomWindowScale = CustomWindowScale.Replace("-scale=", "")
+            If IsNumeric(CustomWindowScale) = False Then
+                CustomWindowScale = 0
+            End If
+            Singleton.GetCurrentInstance().CustomWindowScale = Double.Parse(CustomWindowScale, CultureInfo.InvariantCulture)
+
             If desktop.Args.Contains("already_running") Then
                 Dim HabboProtocol = Environment.GetCommandLineArgs().FirstOrDefault(Function(x) x.StartsWith("habbo://"), "")
                 Dim EmptyWindow = New Window()
