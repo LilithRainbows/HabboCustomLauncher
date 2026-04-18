@@ -1,4 +1,5 @@
 Imports System.Globalization
+Imports System.Reflection
 Imports Avalonia
 Imports Avalonia.Controls
 Imports Avalonia.Controls.ApplicationLifetimes
@@ -25,16 +26,24 @@ Partial Public Class App
             Singleton.GetCurrentInstance().CustomWindowScale = Double.Parse(CustomWindowScale, CultureInfo.InvariantCulture)
 
             If desktop.Args.Contains("already_running") Then
-                Dim HabboProtocol = Environment.GetCommandLineArgs().FirstOrDefault(Function(x) x.StartsWith("habbo://"), "")
-                Dim EmptyWindow = New Window()
-                EmptyWindow.Clipboard.SetTextAsync("hcl_main_focus_" & HabboProtocol).Wait()
-                Process.GetCurrentProcess.Kill()
-                Return
+                HandleAppAlreadyRunning()
+            Else
+                desktop.MainWindow = Nothing
+                Dim LauncherMainWindow = New MainWindow() 'MainWindow will decide which window should be shown
             End If
-            desktop.MainWindow = Nothing
-            Dim LauncherMainWindow = New MainWindow() 'MainWindow will decide which window should be shown
+
+            'MyBase.OnFrameworkInitializationCompleted()
         End If
-        MyBase.OnFrameworkInitializationCompleted()
+    End Sub
+
+    Public Async Sub HandleAppAlreadyRunning()
+        Dim HabboProtocol = Environment.GetCommandLineArgs().FirstOrDefault(Function(x) x.StartsWith("habbo://"), "")
+        Dim EmptyWindow = New Window()
+        If HabboProtocol = "" Then
+            HabboProtocol = Await EmptyWindow.Clipboard.GetTextAsync()
+        End If
+        Await EmptyWindow.Clipboard.SetTextAsync("hcl_main_focus_" & HabboProtocol)
+        Process.GetCurrentProcess.Kill()
     End Sub
 
 End Class

@@ -111,7 +111,7 @@ Partial Public Class MainWindow : Inherits Window
             LoadingWindowChild = New LoadingWindow()
             LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) & " ..." 'Generic loading
             LoadingWindowChild.Show()
-            CopyToClipboard(HabboProtocol).Wait()
+            CopyToClipboard(HabboProtocol)
         End If
         StartRecursiveClipboardLoginCodeCheckAsync()
     End Sub
@@ -135,7 +135,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 27 (17/04/2026)"
+        FooterButton.Text = "CustomLauncher version 28 (18/04/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -1126,7 +1126,7 @@ Partial Public Class MainWindow : Inherits Window
                     StartNewInstanceButton_Click(Nothing, Nothing)
                     Return
                 End If
-                If StartNewInstanceButton.Text.StartsWith(AppTranslator.DownloadingClient(CurrentLanguageInt)) Or StartNewInstanceButton.Text.StartsWith(AppTranslator.ExtractingClient(CurrentLanguageInt)) Then 'Client downloading or extracting
+                If StartNewInstanceButton.Text.StartsWith(AppTranslator.ClientUpdatesCheck(CurrentLanguageInt)) Or StartNewInstanceButton.Text.StartsWith(AppTranslator.DownloadingClient(CurrentLanguageInt)) Or StartNewInstanceButton.Text.StartsWith(AppTranslator.ExtractingClient(CurrentLanguageInt)) Then 'Client update check or downloading or extracting
                     LoadingWindowChild.StatusLabel.Text = e.NewValue
                 Else
                     LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) & " ..." 'Generic loading
@@ -1277,7 +1277,6 @@ Public Class JsonClientUrls
     Public ReadOnly FlashWindowsUrl As String
 
     Public Sub New(JsonString As String)
-        'Application.Current.Clipboard.SetTextAsync(JsonString).Wait()
         Dim JsonRoot As JsonElement = JsonDocument.Parse(JsonString).RootElement
         FlashWindowsVersion = JsonRoot.GetProperty("flash-windows-version").GetString()
         FlashWindowsUrl = JsonRoot.GetProperty("flash-windows").GetString()
