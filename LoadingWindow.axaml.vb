@@ -233,6 +233,15 @@ $")"
             Process.GetCurrentProcess.Kill()
         End If
     End Sub
+    Public Async Function MsgBox(Title As String, Message As String, Optional ClipboardDebugContent As String = "") As Task(Of Boolean)
+        Dim ErrorDialog As New MessageBox()
+        ErrorDialog.ConfigureContent(Title, Message, ClipboardDebugContent)
+        Do While Window.IsVisible = False
+            Await Task.Delay(100)
+        Loop
+        Await ErrorDialog.ShowDialog(Window)
+        Return True
+    End Function
 End Class
 
 Public Class LauncherUpdaterTranslator

@@ -1,6 +1,7 @@
 Imports System.Globalization
 Imports System.IO
 Imports System.IO.Compression
+Imports System.IO.Pipes
 Imports System.Net.Http
 Imports System.Reflection
 Imports System.Runtime.InteropServices
@@ -8,6 +9,7 @@ Imports System.Security.Principal
 Imports System.Text
 Imports System.Text.Json
 Imports System.Text.Json.Nodes
+Imports System.Threading
 Imports Avalonia
 Imports Avalonia.Controls
 Imports Avalonia.Interactivity
@@ -36,12 +38,14 @@ Partial Public Class MainWindow : Inherits Window
     Private WithEvents GithubButton As Image
     Private WithEvents SulakeButton As Image
     Private WithEvents FooterButton As CustomButton
+    Public FakeClipboardContent As String
     Public CurrentLoginCode As LoginCode
     Public CurrentClientUrls As JsonClientUrls
     Public CurrentDownloadProgress As Integer
     Public UpdateSource As String = "AIR_Plus"
     Public CurrentLanguageInt As Integer = 0
-    Private ReadOnly HttpClient As New HttpClient()
+    Private HttpClient As New HttpClient()
+    Private NamedPipeCancellationTokenSource As CancellationTokenSource
     Public UnixPatchName As String = "HabboAirLinuxPatch_x64.zip" 'Depending on the platform, it can automatically become HabboAirLinuxPatch_x64.zip and HabboAirOSXPatch.zip
     Public WindowsPatchName As String = "HabboAirWindowsPatch_x86.zip" 'Depending on the architecture, it can automatically become HabboAirWindowsPatch_x64.zip
     Public AirPlusPatchName As String = "HabboAirPlusPatch.zip"
@@ -80,8 +84,11 @@ Partial Public Class MainWindow : Inherits Window
         Singleton.GetCurrentInstance().ScaleMainGrid(Window)
         Singleton.GetCurrentInstance().MainWindow = Me
 
+        StartPipedLoginTicketListener()
+
         LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeNotDetected(CurrentLanguageInt)
-        StartNewInstanceButton.Text = AppTranslator.UnknownClientVersion(CurrentLanguageInt)
+        'LoginCodeButton.BackColor = Color.Parse("#700000")
+        StartNewInstanceButton.Text = AppTranslator.CheckUpdatesAndLaunchClient(CurrentLanguageInt)
 
         DisplayLauncherVersionOnFooter()
         RefreshUpdateSourceText()
@@ -111,9 +118,58 @@ Partial Public Class MainWindow : Inherits Window
             LoadingWindowChild = New LoadingWindow()
             LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) & " ..." 'Generic loading
             LoadingWindowChild.Show()
-            CopyToClipboard(HabboProtocol)
+            'CopyToClipboard(HabboProtocol)
+
+            'Console.WriteLine(HabboProtocol) 'lilithcita debug
+            FakeClipboardContent = HabboProtocol
+
+
+            LoadingWindowClientLaunchRequested = True
+            LaunchClientFromLoadingWindowWithDelay(3)
         End If
         StartRecursiveClipboardLoginCodeCheckAsync()
+    End Sub
+
+    Public Async Sub StartPipedLoginTicketListener()
+        Try
+            If NamedPipeCancellationTokenSource Is Nothing Then
+                NamedPipeCancellationTokenSource = New CancellationTokenSource()
+                While Not NamedPipeCancellationTokenSource.Token.IsCancellationRequested
+                    Using pipeServer As New NamedPipeServerStream("HabboCustomLauncherBeta", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous)
+                        Await pipeServer.WaitForConnectionAsync(NamedPipeCancellationTokenSource.Token)
+                        Using reader As New StreamReader(pipeServer)
+                            Dim arguments As String = Await reader.ReadLineAsync()
+                            If arguments IsNot Nothing Then
+                                If Window.IsActive = False And LoadingWindowChild Is Nothing Then
+                                    Await EnsureWindowFocus(Window)
+                                End If
+                                If arguments = "main" = False Then
+
+                                    FakeClipboardContent = arguments
+                                    'Await Clipboard.SetTextAsync(arguments)
+
+                                    'Await CheckClipboardLoginCodeAsync()
+                                End If
+                            End If
+                        End Using
+                    End Using
+                End While
+            End If
+        Catch
+            'Console.WriteLine("PipeServer error!")
+        End Try
+        StopPipedLoginTicketListener()
+    End Sub
+
+    Public Sub StopPipedLoginTicketListener()
+        Try
+            If NamedPipeCancellationTokenSource IsNot Nothing Then
+                NamedPipeCancellationTokenSource.Cancel()
+                NamedPipeCancellationTokenSource.Dispose()
+                NamedPipeCancellationTokenSource = Nothing
+            End If
+        Catch
+        End Try
     End Sub
 
     Public Function GetAirPatchNameForCurrentOS() As String
@@ -122,6 +178,16 @@ Partial Public Class MainWindow : Inherits Window
         Else
             Return UnixPatchName
         End If
+    End Function
+
+
+    Public Async Function GetClipboardText() As Task(Of String)
+        Try
+            Return Await Clipboard.GetTextAsync()
+        Catch ex As Exception
+            'Console.WriteLine("GetClipboardText() error: " & ex.Message)
+            Return False
+        End Try
     End Function
 
     Public Async Function CopyToClipboard(Argument As String) As Task(Of Boolean)
@@ -135,7 +201,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 28 (18/04/2026)"
+        FooterButton.Text = "CustomLauncher version 29 (09/06/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -158,28 +224,40 @@ Partial Public Class MainWindow : Inherits Window
             ChangeUpdateSourceButton.IsButtonDisabled = True
             ChangeUpdateSourceButton2.IsButtonDisabled = True
             FocusManager.ClearFocus()
-            UpdateClientButtonStatus()
+            CheckUpdatesAndLaunchClient()
         End If
-        If StartNewInstanceButton.Text.StartsWith(AppTranslator.UpdateClientVersion(CurrentLanguageInt)) Then
+        'If StartNewInstanceButton.Text.StartsWith(AppTranslator.UpdateClientVersion(CurrentLanguageInt)) Then
+        '    StartNewInstanceButton.IsButtonDisabled = True
+        '    StartNewInstanceButton2.IsButtonDisabled = True
+        '    ChangeUpdateSourceButton.IsButtonDisabled = True
+        '    ChangeUpdateSourceButton2.IsButtonDisabled = True
+        '    FocusManager.ClearFocus()
+        '    UpdateClient()
+        'End If
+        'If StartNewInstanceButton.Text.StartsWith(AppTranslator.LaunchClientVersion(CurrentLanguageInt)) Then
+        '    StartNewInstanceButton.IsButtonDisabled = True
+        '    StartNewInstanceButton2.IsButtonDisabled = True
+        '    ChangeUpdateSourceButton.IsButtonDisabled = False
+        '    ChangeUpdateSourceButton2.IsButtonDisabled = False
+        '    FocusManager.ClearFocus()
+        '    LaunchClient()
+        'End If
+        If StartNewInstanceButton.Text.StartsWith(AppTranslator.CheckUpdatesAndLaunchClient(CurrentLanguageInt)) Then
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
             ChangeUpdateSourceButton.IsButtonDisabled = True
             ChangeUpdateSourceButton2.IsButtonDisabled = True
             FocusManager.ClearFocus()
-            UpdateClient()
-        End If
-        If StartNewInstanceButton.Text.StartsWith(AppTranslator.LaunchClientVersion(CurrentLanguageInt)) Then
-            StartNewInstanceButton.IsButtonDisabled = True
-            StartNewInstanceButton2.IsButtonDisabled = True
-            ChangeUpdateSourceButton.IsButtonDisabled = True
-            ChangeUpdateSourceButton2.IsButtonDisabled = True
-            FocusManager.ClearFocus()
-            LaunchClient()
+            CheckUpdatesAndLaunchClient()
         End If
     End Sub
 
     Public Async Function LaunchClient() As Task
         Try
+            StartNewInstanceButton.Text = AppTranslator.CleaningClients(CurrentLanguageInt)
+            Await CleanDeprecatedClients()
+
+            StartNewInstanceButton.Text = AppTranslator.LaunchingClient(CurrentLanguageInt)
             Dim ClientProcess As New Process
             If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then 'Windows
                 ClientProcess.StartInfo.FileName = Path.Combine(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), "Habbo.exe")
@@ -191,13 +269,26 @@ Partial Public Class MainWindow : Inherits Window
             End If
             ClientProcess.StartInfo.Arguments = "-server " & CurrentLoginCode.ServerId & " -ticket " & CurrentLoginCode.SSOTicket
             Await Task.Run(Sub() ClientProcess.Start())
+            Await Task.Delay(1000)
+
+            If String.IsNullOrWhiteSpace(New LoginCode(Await GetClipboardText()).ServerUrl) = False Then
+                Await CopyToClipboard("")
+            End If
+
             CurrentLoginCode = Nothing
+            FakeClipboardContent = ""
+
+            StartNewInstanceButton.IsButtonDisabled = True
+            StartNewInstanceButton2.IsButtonDisabled = True
+            ChangeUpdateSourceButton.IsButtonDisabled = False
+            ChangeUpdateSourceButton2.IsButtonDisabled = False
+            StartNewInstanceButton.Text = AppTranslator.CheckUpdatesAndLaunchClient(CurrentLanguageInt)
         Catch ex As Exception
             StartNewInstanceButton.IsButtonDisabled = False
             StartNewInstanceButton2.IsButtonDisabled = False
             ChangeUpdateSourceButton.IsButtonDisabled = False
             ChangeUpdateSourceButton2.IsButtonDisabled = False
-            StartNewInstanceButton.Text = AppTranslator.LaunchClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
+            StartNewInstanceButton.Text = AppTranslator.CheckUpdatesAndLaunchClient(CurrentLanguageInt)
             MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientLaunchError(CurrentLanguageInt), ex.Message)
         End Try
     End Function
@@ -406,11 +497,13 @@ Partial Public Class MainWindow : Inherits Window
                 AddOrUpdateInstallation(CurrentClientUrls.FlashWindowsVersion, ClientFolderPath, "air", 0)
             End If
 
-            StartNewInstanceButton.IsButtonDisabled = False
-            StartNewInstanceButton2.IsButtonDisabled = False
-            ChangeUpdateSourceButton.IsButtonDisabled = False
-            ChangeUpdateSourceButton2.IsButtonDisabled = False
-            StartNewInstanceButton.Text = AppTranslator.LaunchClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
+            LaunchClient()
+
+            'StartNewInstanceButton.IsButtonDisabled = False
+            'StartNewInstanceButton2.IsButtonDisabled = False
+            'ChangeUpdateSourceButton.IsButtonDisabled = False
+            'ChangeUpdateSourceButton2.IsButtonDisabled = False
+            'StartNewInstanceButton.Text = AppTranslator.CheckUpdatesAndLaunchClient(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
         Catch ex As Exception
             'StartNewInstanceButton.BackColor = Colors.Red
             StartNewInstanceButton.IsButtonDisabled = False
@@ -501,6 +594,7 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Public Sub CopyEmbeddedAsset(AssetName As String, DestinationFolder As String)
+        Directory.CreateDirectory(DestinationFolder)
         Dim resourceName As String = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/" & AssetName
         Dim resourceStream As Stream = AssetLoader.Open(New Uri(resourceName))
         Using fileStream As FileStream = File.Create(Path.Combine(DestinationFolder, AssetName))
@@ -508,25 +602,39 @@ Partial Public Class MainWindow : Inherits Window
         End Using
     End Sub
 
+
     Public Async Function DownloadRemoteFileAsync(RemoteFileUrl As String, DownloadFilePath As String) As Task(Of String)
+        HttpClient?.Dispose()
+        HttpClient = New HttpClient()
+        HttpClient.Timeout = Timeout.InfiniteTimeSpan
         CurrentDownloadProgress = 0
         HttpClient.DefaultRequestHeaders.Clear()
         HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd(LauncherUserAgent)
         Dim Response = Await HttpClient.GetAsync(RemoteFileUrl, HttpCompletionOption.ResponseHeadersRead)
         Dim totalSize = Response.Content.Headers.ContentLength
-        Dim downloaded = 0
+        Dim downloaded As Long = 0
         Using stream = Await Response.Content.ReadAsStreamAsync()
             Using file = New FileStream(DownloadFilePath, FileMode.Create, FileAccess.Write)
-                Dim buffer(1024) As Byte
+                Dim buffer(8191) As Byte
                 Dim bytesRead As Integer
                 Do
-                    bytesRead = Await stream.ReadAsync(buffer, 0, buffer.Length)
-                    Await file.WriteAsync(buffer, 0, bytesRead)
-                    downloaded += bytesRead
-                    CurrentDownloadProgress = CInt(downloaded / totalSize * 100)
+                    Dim readTask = stream.ReadAsync(buffer, 0, buffer.Length)
+                    If Await Task.WhenAny(readTask, Task.Delay(10000)) IsNot readTask Then
+                        Throw New TimeoutException()
+                    End If
+                    bytesRead = Await readTask
+                    If bytesRead > 0 Then
+                        Await file.WriteAsync(buffer, 0, bytesRead)
+                        downloaded += bytesRead
+                        If totalSize.HasValue Then
+                            CurrentDownloadProgress =
+                            CInt(downloaded / totalSize.Value * 100)
+                        End If
+                    End If
                 Loop While bytesRead > 0
             End Using
         End Using
+        Return DownloadFilePath
     End Function
 
     Private Async Sub StartRecursiveClipboardLoginCodeCheckAsync()
@@ -550,17 +658,30 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Async Function CheckClipboardLoginCodeAsync() As Task(Of Boolean)
         Try
-
-            Dim ClipboardText = Await Clipboard.GetTextAsync()
-
-
-            If ClipboardText.StartsWith("hcl_main_focus_") Then
-                ClipboardText = ClipboardText.Replace("hcl_main_focus_", "")
-                Await EnsureCurrentWindowFocus()
-                Await CopyToClipboard(ClipboardText)
+            'Console.WriteLine("Trying to read clipboard")
+            Dim ClipboardText = Await GetClipboardText()
+            'Console.WriteLine("Clipboard readed")
+            If ClipboardText = Nothing And FakeClipboardContent = "" Then
+                'Console.WriteLine("Clipboard is empty")
+                Throw New Exception("Empty clipboard login code")
+                'Return False
             End If
+            'Console.WriteLine("Trying to analyze clipboard content")
+
             Dim ClipboardLoginCode As New LoginCode(ClipboardText)
+
+
             If String.IsNullOrWhiteSpace(ClipboardLoginCode.ServerUrl) Then
+                'Console.WriteLine("Trying to use fake clipboard")
+                ClipboardLoginCode = New LoginCode(FakeClipboardContent)
+            Else
+                FakeClipboardContent = ""
+            End If
+
+
+
+            If String.IsNullOrWhiteSpace(ClipboardLoginCode.ServerUrl) Then
+                'Console.WriteLine("Invalid clipboard login code")
                 Throw New Exception("Invalid clipboard login code")
             Else
                 Dim OldLoginTicket As String = ""
@@ -568,51 +689,72 @@ Partial Public Class MainWindow : Inherits Window
                     OldLoginTicket = CurrentLoginCode.SSOTicket
                 End If
                 CurrentLoginCode = ClipboardLoginCode
-                Await CopyToClipboard("")
+                'Await CopyToClipboard("")
                 LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeDetected(CurrentLanguageInt) & " [" & ClipboardLoginCode.ServerId.Replace("hh", "").ToUpper & "]"
+
+
+
+                'Await MsgBox("", "New login code detected!")
+
+
+
+                'LoginCodeButton.BackColor = Color.Parse("#165000")
                 If OldLoginTicket = ClipboardLoginCode.SSOTicket = False Then
                     Await EnsureCurrentWindowFocus()
                     DisplayCurrentUserOnFooter()
-                    Await UpdateClientButtonStatus()
+                    StartNewInstanceButton.IsButtonDisabled = False
+                    StartNewInstanceButton2.IsButtonDisabled = False
                     Return True
                 End If
                 'Await Application.Current.Clipboard.SetTextAsync("ServerId: " & LoginCode.ServerId & " - ServerUrl: " & LoginCode.ServerUrl & " - SSOTicket: " & LoginCode.SSOTicket)
             End If
         Catch ex As Exception
+            'Console.WriteLine("Clipboard read error: " & ex.Message)
             If CurrentLoginCode IsNot Nothing Then
                 Return False 'Ignore invalid clipboard login codes if there is already a valid login code
             End If
             CurrentLoginCode = Nothing
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
-            ChangeUpdateSourceButton.IsButtonDisabled = True
-            ChangeUpdateSourceButton2.IsButtonDisabled = True
+            ChangeUpdateSourceButton.IsButtonDisabled = False
+            ChangeUpdateSourceButton2.IsButtonDisabled = False
             LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeNotDetected(CurrentLanguageInt)
-            StartNewInstanceButton.Text = AppTranslator.UnknownClientVersion(CurrentLanguageInt)
+            'LoginCodeButton.BackColor = Color.Parse("#700000")
+            StartNewInstanceButton.Text = AppTranslator.CheckUpdatesAndLaunchClient(CurrentLanguageInt)
             DisplayLauncherVersionOnFooter()
         End Try
         Return False
     End Function
 
-    Public Async Function CleanDeprecatedClients() As Task
-        'AGREGAR OPCION PARA HABILITAR/DESHABILITAR LA LIMPIEZA AUTOMATICA DE CLIENTES OBSOLETOS?
+    Public Async Function CleanDeprecatedClients(Optional ClientsToKeep As Integer = 3) As Task(Of Boolean)
+Try
+            Dim SomethingFailed As Boolean = false
+    Dim ClientPath As String = GetPossibleClientPath("")
+    Dim FoldersToDelete = Directory.GetDirectories(ClientPath).
+        Where(Function(d) File.Exists(Path.Combine(d, "HabboAir.swf"))).
+        OrderByDescending(Function(d) File.GetLastWriteTimeUtc(Path.Combine(d, "HabboAir.swf"))).
+        Skip(ClientsToKeep)
+    For Each Folder In FoldersToDelete
         Try
-            If UpdateSource = "AIR_Official" Then
-                StartNewInstanceButton.Text = "Cleaning deprecated clients"
-                Dim JsonRoot As JsonElement = JsonDocument.Parse(Await GetRemoteJsonAsync("https://images.habbo.com/habbo-native-clients/launcher/clientversions.json")).RootElement
-                Dim ValidClientVersions As String() = JsonRoot.GetProperty("win").GetProperty("air").EnumerateArray().Select(Function(x) x.GetString()).ToArray
-                For Each InstalledClientVersion In Directory.GetDirectories(GetPossibleClientPath("")).Select(Function(x) Path.GetFileName(x))
-                    If IsNumeric(InstalledClientVersion) AndAlso ValidClientVersions.Contains(InstalledClientVersion) = False Then
-                        Await Task.Run(Sub() Directory.Delete(GetPossibleClientPath(InstalledClientVersion), True))
-                    End If
-                Next
-            End If
-        Catch
-            'We ignore the error
+                    Directory.Delete(Folder, True)
+        Catch ex As Exception
+                    SomethingFailed = true
         End Try
+    Next
+           If SomethingFailed
+                 Return false
+                Else
+                 Return true
+           End If
+Catch
+            Return false
+End Try
     End Function
 
     Public Async Function GetRemoteLastModifiedHeaderEpoch(url As String) As Task(Of String)
+        HttpClient?.Dispose()
+        HttpClient = New HttpClient()
+        HttpClient.Timeout = TimeSpan.FromSeconds(10)
         HttpClient.DefaultRequestHeaders.Clear()
         HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36")
         Dim request As New HttpRequestMessage(HttpMethod.Head, url)
@@ -639,43 +781,56 @@ Partial Public Class MainWindow : Inherits Window
         End Try
     End Function
 
-    Public Async Function UpdateClientButtonStatus() As Task
+    Public Async Function CheckUpdatesAndLaunchClient() As Task
         StartNewInstanceButton.IsButtonDisabled = True
         StartNewInstanceButton2.IsButtonDisabled = True
         ChangeUpdateSourceButton.IsButtonDisabled = True
         ChangeUpdateSourceButton2.IsButtonDisabled = True
+
         Try
             Dim IsClientUpdated As Boolean = False
             StartNewInstanceButton.Text = AppTranslator.ClientUpdatesCheck(CurrentLanguageInt)
             If UpdateSource = "AIR_Official" Then
-                CurrentClientUrls = New JsonClientUrls(Await GetRemoteJsonAsync("https://" & CurrentLoginCode.ServerUrl & "/gamedata/clienturls"))
+                Try
+                    CurrentClientUrls = New JsonClientUrls(Await GetRemoteJsonAsync("https://" & CurrentLoginCode.ServerUrl & "/gamedata/clienturls"))
+                Catch
+                    CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GetLatestLocalClientVersion() & "','flash-windows':'" & AirPlusClientURL & "'}").Replace("'", Chr(34)))
+                End try
             End If
             If UpdateSource = "AIR_Plus" Then
-                Dim AirPlusClientLatestVersion = Await GetRemoteLastModifiedHeaderEpoch(AirPlusClientURL)
+                Dim AirPlusClientLatestVersion As String
+                Try
+                    AirPlusClientLatestVersion = Await GetRemoteLastModifiedHeaderEpoch(AirPlusClientURL)
+                Catch
+                    AirPlusClientLatestVersion = GetLatestLocalClientVersion()
+                End Try
                 CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & AirPlusClientLatestVersion & "','flash-windows':'" & AirPlusClientURL & "'}").Replace("'", Chr(34)))
             End If
 
             IsClientUpdated = IsClientVersionExists()
-            'Await CleanDeprecatedClients() 'No se si lo ideal seria ponerlo aca o solo en UpdateClient, lo malo seria que de esa forma si un cliente se actualiza a un server actualiza a una version de cliente ya existe entonces no se eliminaria la version anterior a menos que se vuelva a actualizar.
 
             If IsClientUpdated Then 'Abria que verificar swf o mejor aun que exista un archivo READY para asegurarse que se completo todo el proceso de modificacion
-                StartNewInstanceButton.Text = AppTranslator.LaunchClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
+                LaunchClient()
             Else
-                StartNewInstanceButton.Text = AppTranslator.UpdateClientVersion(CurrentLanguageInt) & " " & CurrentClientUrls.FlashWindowsVersion
+                UpdateClient()
             End If
 
         Catch ex As Exception
             'StartNewInstanceButton.BackColor = Media.Color.FromRgb(200, 0, 0)
+            StartNewInstanceButton.IsButtonDisabled = False
+            StartNewInstanceButton2.IsButtonDisabled = False
+            ChangeUpdateSourceButton.IsButtonDisabled = False
+            ChangeUpdateSourceButton2.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt)
             MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientUpdatesCheckError(CurrentLanguageInt), ex.Message)
         End Try
-        StartNewInstanceButton.IsButtonDisabled = False
-        StartNewInstanceButton2.IsButtonDisabled = False
-        ChangeUpdateSourceButton.IsButtonDisabled = False
-        ChangeUpdateSourceButton2.IsButtonDisabled = False
+        'StartNewInstanceButton.IsButtonDisabled = False
+        'StartNewInstanceButton2.IsButtonDisabled = False
+        'ChangeUpdateSourceButton.IsButtonDisabled = False
+        'ChangeUpdateSourceButton2.IsButtonDisabled = False
     End Function
 
-    Public Function GetAppDataPath() As String
+    Public Shared Function GetAppDataPath() As String
         Dim AppDataFolderPath As String = "" 'Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
         If String.IsNullOrWhiteSpace(AppDataFolderPath) Then
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
@@ -688,6 +843,20 @@ Partial Public Class MainWindow : Inherits Window
         End If
         Directory.CreateDirectory(AppDataFolderPath)
         Return AppDataFolderPath
+    End Function
+
+    Function GetLatestLocalClientVersion() As String
+        Try
+            Dim ClientPath As String = GetPossibleClientPath("")
+            ClientPath = Directory.GetDirectories(ClientPath).
+                Select(Function(d) Path.Combine(d, "HabboAir.swf")).
+                Where(Function(f) File.Exists(f)).
+                OrderByDescending(Function(f) File.GetLastWriteTimeUtc(f)).
+                First()
+            Return New DirectoryInfo(Path.GetDirectoryName(ClientPath)).Name
+        Catch
+        End Try
+        Throw New Exception("Failed to get latest local client version")
     End Function
 
     Public Function GetPossibleClientPath(ClientVersion As String) As String
@@ -717,6 +886,9 @@ Partial Public Class MainWindow : Inherits Window
     End Sub
 
     Public Async Function GetRemoteJsonAsync(JsonUrl As String) As Task(Of String)
+        HttpClient?.Dispose()
+        HttpClient = New HttpClient()
+        HttpClient.Timeout = TimeSpan.FromSeconds(10)
         HttpClient.DefaultRequestHeaders.Clear()
         HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd(LauncherUserAgent)
         Dim Response As HttpResponseMessage = Await HttpClient.GetAsync(JsonUrl)
@@ -728,7 +900,8 @@ Partial Public Class MainWindow : Inherits Window
     End Function
 
     Private Sub LoginCodeButton_Click(sender As Object, e As EventArgs) Handles LoginCodeButton.Click
-        If LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeNotDetected(CurrentLanguageInt) = False Then
+        If StartNewInstanceButton.IsButtonDisabled = False Then
+            FakeClipboardContent = ""
             CurrentLoginCode = Nothing
             Return
         End If
@@ -796,24 +969,34 @@ Partial Public Class MainWindow : Inherits Window
         End Select
         SaveCurrentUpdateSource()
         RefreshUpdateSourceText()
-        UpdateClientButtonStatus()
+        'UpdateClientButtonStatus()
     End Sub
 
     Private Sub StartNewInstanceButton2_Click(sender As Object, e As EventArgs) Handles StartNewInstanceButton2.Click
-        'Temporalmente elimina la instalacion actual, en un futuro deberia abrirse una ventana con varias opciones
-        '(Por ejemplo usar una version especifica ya descargada del cliente, borrar instalacion existente, borrar todas instalaciones, etc.)
+        Dim ErrorsList As New List(Of String)
         Try
-            Directory.Delete(GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion), True)
-            RemoveInstallation(CurrentClientUrls.FlashWindowsVersion, "air")
-            StartNewInstanceButton.IsButtonDisabled = True
-            StartNewInstanceButton2.IsButtonDisabled = True
-            ChangeUpdateSourceButton.IsButtonDisabled = True
-            ChangeUpdateSourceButton2.IsButtonDisabled = True
-            FocusManager.ClearFocus()
-            UpdateClientButtonStatus()
+            Dim ClientsDirectory = GetPossibleClientPath("")
+            For Each ClientVersionFolder In Directory.GetDirectories(ClientsDirectory)
+                Try
+                    Directory.Delete(ClientVersionFolder, True)
+                Catch ex As Exception
+                    ErrorsList.Add(ex.GetType.Name & ": " & ex.Message)
+                End Try
+            Next
+            Directory.Delete(ClientsDirectory, True)
         Catch ex As Exception
-            MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientDeleteError(CurrentLanguageInt), ex.Message)
+            If TypeOf ex Is DirectoryNotFoundException Then
+                MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), AppTranslator.ClientsDeleteEmpty(CurrentLanguageInt))
+                Return
+            End If
+            ErrorsList.Add(ex.GetType.Name & ": " & ex.Message)
         End Try
+        ErrorsList = ErrorsList.Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+        If ErrorsList.Any Then
+            MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientsDeleteError(CurrentLanguageInt), String.Join(Environment.NewLine, ErrorsList))
+        Else
+            MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), AppTranslator.ClientsDeleteOk(CurrentLanguageInt))
+        End If
     End Sub
 
     Public Function RegisterHabboProtocol() As Boolean
@@ -1043,6 +1226,7 @@ Partial Public Class MainWindow : Inherits Window
                 ShortcutPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop")
             End If
             Dim IconsPath As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".icons")
+            Dim IconsPath2 As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "icons")
             If isDesktop = False Then
                 ShortcutPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "applications")
             End If
@@ -1058,23 +1242,18 @@ Partial Public Class MainWindow : Inherits Window
             Directory.CreateDirectory(IconsPath)
             Directory.CreateDirectory(ShortcutPath)
             CopyEmbeddedAsset("HabboCustomLauncherIcon.png", IconsPath)
+            CopyEmbeddedAsset("HabboCustomLauncherIcon.png", IconsPath2)
             File.WriteAllText(Path.Combine(ShortcutPath, appName & ".desktop"), shortcutContent)
             MakeUnixExecutable(Path.Combine(ShortcutPath, appName & ".desktop"))
         End If
     End Sub
 
     Private Sub ChangeUpdateSourceButton2_Click(sender As Object, e As EventArgs) Handles ChangeUpdateSourceButton2.Click
-        Dim contextMenu As New ContextMenu
         Dim ClientHint As String = AppTranslator.ClassicAirClientHint(CurrentLanguageInt)
         If UpdateSource = "AIR_Plus" Then
             ClientHint = AppTranslator.AirPlusClientHint(CurrentLanguageInt)
         End If
-        contextMenu.Items.Add(New MenuItem With {.Header = ClientHint})
-        If ChangeUpdateSourceButton2.ContextMenu IsNot Nothing Then
-            ChangeUpdateSourceButton2.ContextMenu.Close()
-        End If
-        ChangeUpdateSourceButton2.ContextMenu = contextMenu
-        ChangeUpdateSourceButton2.ContextMenu.Open()
+        MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), ClientHint)
     End Sub
 
     Private Sub TitleBarLabel_PointerPressed(sender As Object, e As Input.PointerPressedEventArgs) Handles TitleBarLabel.PointerPressed
@@ -1112,25 +1291,20 @@ Partial Public Class MainWindow : Inherits Window
                     LoadingWindowChild.Close()
                     Return
                 End If
-                If StartNewInstanceButton.Text.StartsWith(AppTranslator.LaunchClientVersion(CurrentLanguageInt)) Then 'Launch client
-                    LoadingWindowClientLaunchRequested = True
-                    'StartNewInstanceButton_Click(Nothing, Nothing)
-                    LaunchClientFromLoadingWindowWithDelay(3)
-                    Return
-                End If
-                If StartNewInstanceButton.Text.StartsWith(AppTranslator.UnknownClientVersion(CurrentLanguageInt)) AndAlso LoadingWindowClientLaunchRequested = True Then 'Client launched
+                If StartNewInstanceButton.Text = AppTranslator.CheckUpdatesAndLaunchClient(CurrentLanguageInt) AndAlso LoadingWindowClientLaunchRequested = True Then 'Client launched
                     Process.GetCurrentProcess.Kill()
                     Return
                 End If
-                If StartNewInstanceButton.Text.StartsWith(AppTranslator.UpdateClientVersion(CurrentLanguageInt)) Then 'Update client
-                    StartNewInstanceButton_Click(Nothing, Nothing)
-                    Return
-                End If
-                If StartNewInstanceButton.Text.StartsWith(AppTranslator.ClientUpdatesCheck(CurrentLanguageInt)) Or StartNewInstanceButton.Text.StartsWith(AppTranslator.DownloadingClient(CurrentLanguageInt)) Or StartNewInstanceButton.Text.StartsWith(AppTranslator.ExtractingClient(CurrentLanguageInt)) Then 'Client update check or downloading or extracting
-                    LoadingWindowChild.StatusLabel.Text = e.NewValue
-                Else
-                    LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) & " ..." 'Generic loading
-                End If
+                'If StartNewInstanceButton.Text.StartsWith(AppTranslator.UpdateClientVersion(CurrentLanguageInt)) Then 'Update client
+                '    StartNewInstanceButton_Click(Nothing, Nothing)
+                '    Return
+                'End If
+                LoadingWindowChild.StatusLabel.Text = e.NewValue
+                'If StartNewInstanceButton.Text.StartsWith(AppTranslator.ClientUpdatesCheck(CurrentLanguageInt)) Or StartNewInstanceButton.Text.StartsWith(AppTranslator.DownloadingClient(CurrentLanguageInt)) Or StartNewInstanceButton.Text.StartsWith(AppTranslator.ExtractingClient(CurrentLanguageInt)) Then 'Client update check or downloading or extracting
+                '    LoadingWindowChild.StatusLabel.Text = e.NewValue
+                'Else
+                '    LoadingWindowChild.StatusLabel.Text = AppTranslator.GenericLoading(CurrentLanguageInt) & " ..." 'Generic loading
+                'End If
             End If
         End If
     End Sub
@@ -1290,6 +1464,9 @@ Public Class LoginCode
     Public ReadOnly Username As String = ""
 
     Public Sub New(LoginCode As String)
+        If LoginCode Is Nothing Then
+            LoginCode = ""
+        End If
         If LoginCode.StartsWith("habbo://") And LoginCode.Contains("server=") Then 'Example: habbo://hab?server=hhes&token=11111111-1111-1111-1111-111111111111-11111111.V4.LilithRainbows
             LoginCode = LoginCode.Remove(0, LoginCode.IndexOf("?server=") + 8)
             LoginCode = LoginCode.Replace("&token=", ".")
@@ -1365,9 +1542,17 @@ End Class
 
 Public Class AppTranslator
     '0=English 1=Spanish
+    Public Shared GenericInfo As String() = {
+        "Information",
+        "Informacion"
+    }
     Public Shared GenericLoading As String() = {
         "Loading",
         "Cargando"
+    }
+    Public Shared LaunchingClient As String() = {
+        "Launching client",
+        "Ejecutando cliente"
     }
     Public Shared DownloadingClient As String() = {
         "Downloading client",
@@ -1389,10 +1574,10 @@ Public Class AppTranslator
         "Clipboard login code not detected",
         "Codigo de inicio de sesion del portapapeles no detectado"
     }
-    Public Shared UnknownClientVersion As String() = {
-        "Unknown client version",
-        "Version del cliente desconocida"
-    }
+    'Public Shared UnknownClientVersion As String() = {
+    '    "Unknown client version",
+    '    "Version del cliente desconocida"
+    '}
     Public Shared CurrentUpdateSource As String() = {
         "Current update source",
         "Fuente de actualizaciones"
@@ -1405,13 +1590,17 @@ Public Class AppTranslator
         "Checking for client updates",
         "Verificando actualizaciones del cliente"
     }
-    Public Shared UpdateClientVersion As String() = {
-        "Update client to version",
-        "Actualizar cliente a la version"
-    }
-    Public Shared LaunchClientVersion As String() = {
-        "Launch client version",
-        "Ejecutar cliente version"
+    'Public Shared UpdateClientVersion As String() = {
+    '    "Update client to version",
+    '    "Actualizar cliente a la version"
+    '}
+    'Public Shared LaunchClientVersion As String() = {
+    '    "Launch client version",
+    '    "Ejecutar cliente version"
+    '}
+    Public Shared CheckUpdatesAndLaunchClient As String() = {
+        "Check for updates and launch client",
+        "Buscar actualizaciones y ejecutar cliente"
     }
     Public Shared Enabled As String() = {
         "Enabled",
@@ -1420,6 +1609,10 @@ Public Class AppTranslator
     Public Shared Disabled As String() = {
         "Disabled",
         "Deshabilitado"
+    }
+    Public Shared CleaningClients As String() = {
+        "Cleaning clients",
+        "Limpiando clientes"
     }
     Public Shared AddDesktopShortcut As String() = {
         "Add shortcut to desktop",
@@ -1441,9 +1634,17 @@ Public Class AppTranslator
         "Client could not be updated!",
         "No se pudo actualizar el cliente!"
     }
-    Public Shared ClientDeleteError As String() = {
-        "Client version could not be deleted!",
-        "No se pudo eliminar la version del cliente!"
+    Public Shared ClientsDeleteOk As String() = {
+        "Clients were successfully deleted!",
+        "Los clientes fueron eliminados correctamente!"
+    }
+    Public Shared ClientsDeleteEmpty As String() = {
+        "There are no clients available to delete!",
+        "No hay clientes disponibles para eliminar!"
+    }
+    Public Shared ClientsDeleteError As String() = {
+        "Some errors occurred while deleting the clients!",
+        "Ocurrieron algunos errores al eliminar los clientes!"
     }
     Public Shared ClientUpdatesCheckError As String() = {
         "Client updates could not be checked!",
@@ -1454,11 +1655,11 @@ Public Class AppTranslator
         "Error (CTRL + C para copiar detalles tecnicos)"
     }
     Public Shared ClassicAirClientHint As String() = {
-        "The official classic Habbo client without modifications.",
-        "El cliente clasico oficial de Habbo sin modificaciones."
+        "The official classic Habbo client without any modifications." & Environment.NewLine & "Ideal if you want to stay up to date and avoid any risk of account sanctions." & Environment.NewLine & "Does NOT include any additional commands, features, or enhancements.",
+        "El cliente clasico oficial de Habbo sin modificaciones." & Environment.NewLine & "Ideal si quieres estar siempre actualizado y no correr ningun riesgo de sanciones." & Environment.NewLine & "NO incluye comandos, funciones ni mejoras adicionales."
     }
     Public Shared AirPlusClientHint As String() = {
-        "The classic Habbo client with unofficial modifications.",
-        "El cliente clasico de Habbo con modificaciones no oficiales."
+        "The classic Habbo client with unofficial modifications." & Environment.NewLine & "Ideal if you want to enjoy additional commands, features, and enhancements, although client base may not always be up to date." & Environment.NewLine & "Depending on how it is used, there may be a slight risk of sanctions.",
+        "El cliente clasico de Habbo con modificaciones no oficiales." & Environment.NewLine & "Ideal si quieres disfrutar de comandos, funciones y mejoras adicionales, aunque puede que no siempre tenga la base actualizada." & Environment.NewLine & "Dependiendo el uso puede haber un ligero riesgo de sanciones."
     }
 End Class

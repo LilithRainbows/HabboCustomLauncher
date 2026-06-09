@@ -1,38 +1,23 @@
 Imports System.Reflection
 Imports System.Runtime.InteropServices
-Imports System.Threading
 Imports Avalonia
 Imports Avalonia.Media
 
 Module Program
-    Private appMutex As Mutex
-
     <STAThread>
     Sub Main(args As String())
         Try
-
-            Dim mutexName As String = "HabboCustomLauncherBeta"
-            Dim isNewInstance As Boolean
-            appMutex = New Mutex(True, mutexName, isNewInstance)
-            If Not isNewInstance Then
-                args = New String() {"already_running"}
-            End If
             StartAvaloniaApp(args)
         Catch
             'App startup error
         End Try
-        Try
-            appMutex.ReleaseMutex()
-        Catch
-            'Error while releasing mutex
-        End Try
-        Environment.Exit(0)
+        Process.GetCurrentProcess.Kill()
     End Sub
 
     Private Sub StartAvaloniaApp(NewWindowArgs As String())
         Dim AvaloniaApp = BuildAvaloniaApp()
         Dim osVersion = Environment.OSVersion.Version
-        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) AndAlso osVersion.Major = 6 AndAlso osVersion.Minor = 1 Then 'Usando Windows 7 se define renderizado por software debido a que el usuario probablemente tenga una gpu demasiado antigua para soportar opengl de forma adecuada (gma3600 por ejemplo da problemas)
+        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then 'AndAlso osVersion.Major = 6 AndAlso osVersion.Minor = 1 'When using Windows 7, software rendering is used because the user likely has a very old GPU (for example, a GMA 3600).
             Dim Win32Options As New Win32PlatformOptions With {
                 .RenderingMode = {Win32RenderingMode.Software},
                 .CompositionMode = {Win32CompositionMode.RedirectionSurface}
@@ -49,10 +34,6 @@ Module Program
             .FontFallbacks = {New FontFallback With {
             .FontFamily = New FontFamily(FontFamilyName)
             }}}
-        'Alternativa:
-        'Dim FontOptions As New FontManagerOptions With {
-        '    .DefaultFamilyName = Nothing
-        '}
         Return AppBuilder.Configure(Of App) _
             .UsePlatformDetect() _
             .LogToTrace() _

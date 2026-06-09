@@ -48,8 +48,8 @@
 									<ColumnDefinition />
 									<ColumnDefinition Width="Auto"/>
 								</Grid.ColumnDefinitions>
-								<local:CustomButton IsButtonDisabled="True" x:Name="ChangeUpdateSourceButton" Grid.Column="0" Text="Current update source: AIR (Official)" BackColor="#990084" />
-								<local:CustomButton IsButtonDisabled="True" x:Name="ChangeUpdateSourceButton2" Grid.Column="1" Width="30" Text="?" BackColor="#990084" Margin="5,0,0,0"/>
+								<local:CustomButton x:Name="ChangeUpdateSourceButton" Grid.Column="0" Text="Current update source: AIR (Official)" BackColor="#990084" />
+								<local:CustomButton x:Name="ChangeUpdateSourceButton2" Grid.Column="1" Width="30" Text="?" BackColor="#990084" Margin="5,0,0,0"/>
 							</Grid>
 						</Grid>
 					</Grid>
