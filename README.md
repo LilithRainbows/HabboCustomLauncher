@@ -1,6 +1,6 @@
 # HabboCustomLauncher
 
-<img width="482" alt="image" src="https://github.com/user-attachments/assets/73dc4578-70d7-42bb-97ed-7d3fdc2e8fce" />
+<img width="482" alt="image" src="https://github.com/user-attachments/assets/9c86231b-e4c8-4ef3-b19e-210c3bf9e5b6" />
 <br><br>
 
 | OS                  | Classic client | App shortcut | App protocol |
