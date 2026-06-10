@@ -954,9 +954,11 @@ End Try
     Private Sub LoginCodeButton2_Click(sender As Object, e As EventArgs) Handles LoginCodeButton2.Click
         Try
             If StartNewInstanceButton.IsButtonDisabled = False Then
-                FakeClipboardContent = ""
                 If CurrentLoginCode.IsFromFakeClipboard = False Then
                     CleanRealClipboardLoginCode(True)
+                Else
+                    FakeClipboardContent = ""
+                    CurrentLoginCode = Nothing
                 End If
                 Return
             End If
