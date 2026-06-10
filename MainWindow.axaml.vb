@@ -32,6 +32,7 @@ Partial Public Class MainWindow : Inherits Window
     Public WithEvents StartNewInstanceButton As CustomButton
     Private WithEvents StartNewInstanceButton2 As CustomButton
     Private WithEvents LoginCodeButton As CustomButton
+    Private WithEvents LoginCodeButton2 As CustomButton
     Private WithEvents ChangeUpdateSourceButton As CustomButton
     Private WithEvents ChangeUpdateSourceButton2 As CustomButton
     Private WithEvents HabboLogoButton As Image
@@ -67,6 +68,7 @@ Partial Public Class MainWindow : Inherits Window
         If loadXaml Then
             AvaloniaXamlLoader.Load(Me)
         End If
+
         'Example: Control = FindNameScope().Find("Control_Name")
         Window = FindNameScope().Find("Window")
         TitleBarLabel = Window.FindNameScope.Find("TitleBarLabel")
@@ -74,6 +76,7 @@ Partial Public Class MainWindow : Inherits Window
         StartNewInstanceButton = Window.FindNameScope.Find("StartNewInstanceButton")
         StartNewInstanceButton2 = Window.FindNameScope.Find("StartNewInstanceButton2")
         LoginCodeButton = Window.FindNameScope.Find("LoginCodeButton")
+        LoginCodeButton2 = Window.FindNameScope.Find("LoginCodeButton2")
         ChangeUpdateSourceButton = Window.FindNameScope.Find("ChangeUpdateSourceButton")
         ChangeUpdateSourceButton2 = Window.FindNameScope.Find("ChangeUpdateSourceButton2")
         HabboLogoButton = Window.FindNameScope.Find("HabboLogoButton")
@@ -87,6 +90,7 @@ Partial Public Class MainWindow : Inherits Window
         StartPipedLoginTicketListener()
 
         LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeNotDetected(CurrentLanguageInt)
+        LoginCodeButton2.IsVisible = False
         'LoginCodeButton.BackColor = Color.Parse("#700000")
         StartNewInstanceButton.Text = AppTranslator.CheckUpdatesAndLaunchClient(CurrentLanguageInt)
 
@@ -201,7 +205,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 29 (09/06/2026)"
+        FooterButton.Text = "CustomLauncher version 30 (10/06/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -271,8 +275,8 @@ Partial Public Class MainWindow : Inherits Window
             Await Task.Run(Sub() ClientProcess.Start())
             Await Task.Delay(1000)
 
-            If String.IsNullOrWhiteSpace(New LoginCode(Await GetClipboardText()).ServerUrl) = False Then
-                Await CopyToClipboard("")
+            If CurrentLoginCode.IsFromFakeClipboard = False Then
+                Await CleanRealClipboardLoginCode(False)
             End If
 
             CurrentLoginCode = Nothing
@@ -291,6 +295,21 @@ Partial Public Class MainWindow : Inherits Window
             StartNewInstanceButton.Text = AppTranslator.CheckUpdatesAndLaunchClient(CurrentLanguageInt)
             MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientLaunchError(CurrentLanguageInt), ex.Message)
         End Try
+    End Function
+
+    Public Async Function CleanRealClipboardLoginCode(CleanCurrentLoginCode As Boolean) As Task(Of Boolean)
+        Dim Ok As Boolean = False
+        Try
+            If CurrentLoginCode.CheckLoginCode(Await Clipboard.GetTextAsync()) Then
+                Await CopyToClipboard("")
+                Ok = True
+            End If
+        Catch
+        End Try
+        If CleanCurrentLoginCode = True Then
+            CurrentLoginCode = Nothing
+        End If
+        Return Ok
     End Function
 
     Public Async Function MsgBox(Title As String, Message As String, Optional ClipboardDebugContent As String = "") As Task(Of Boolean)
@@ -658,26 +677,25 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Async Function CheckClipboardLoginCodeAsync() As Task(Of Boolean)
         Try
-            'Console.WriteLine("Trying to read clipboard")
+            'Console.WriteLine("Trying to read real clipboard")
             Dim ClipboardText = Await GetClipboardText()
-            'Console.WriteLine("Clipboard readed")
+            'Console.WriteLine("Real clipboard readed")
             If ClipboardText = Nothing And FakeClipboardContent = "" Then
-                'Console.WriteLine("Clipboard is empty")
+                'Console.WriteLine("Clipboard (fake+real) is empty")
                 Throw New Exception("Empty clipboard login code")
                 'Return False
             End If
-            'Console.WriteLine("Trying to analyze clipboard content")
-
-            Dim ClipboardLoginCode As New LoginCode(ClipboardText)
+            'Console.WriteLine("Trying to analyze clipboard (fake+real) content")
+            'Console.WriteLine("Trying to use fake clipboard")
+            Dim ClipboardLoginCode As New LoginCode(FakeClipboardContent, True) 'Dim ClipboardLoginCode As New LoginCode(ClipboardText)
 
 
             If String.IsNullOrWhiteSpace(ClipboardLoginCode.ServerUrl) Then
-                'Console.WriteLine("Trying to use fake clipboard")
-                ClipboardLoginCode = New LoginCode(FakeClipboardContent)
+                'Console.WriteLine("Trying to use real clipboard")
+                ClipboardLoginCode = New LoginCode(ClipboardText, False) 'ClipboardLoginCode = New LoginCode(FakeClipboardContent)
             Else
-                FakeClipboardContent = ""
+                'FakeClipboardContent = ""
             End If
-
 
 
             If String.IsNullOrWhiteSpace(ClipboardLoginCode.ServerUrl) Then
@@ -691,7 +709,7 @@ Partial Public Class MainWindow : Inherits Window
                 CurrentLoginCode = ClipboardLoginCode
                 'Await CopyToClipboard("")
                 LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeDetected(CurrentLanguageInt) & " [" & ClipboardLoginCode.ServerId.Replace("hh", "").ToUpper & "]"
-
+                LoginCodeButton2.IsVisible = True
 
 
                 'Await MsgBox("", "New login code detected!")
@@ -719,6 +737,7 @@ Partial Public Class MainWindow : Inherits Window
             ChangeUpdateSourceButton.IsButtonDisabled = False
             ChangeUpdateSourceButton2.IsButtonDisabled = False
             LoginCodeButton.Text = AppTranslator.ClipboardLoginCodeNotDetected(CurrentLanguageInt)
+            LoginCodeButton2.IsVisible = False
             'LoginCodeButton.BackColor = Color.Parse("#700000")
             StartNewInstanceButton.Text = AppTranslator.CheckUpdatesAndLaunchClient(CurrentLanguageInt)
             DisplayLauncherVersionOnFooter()
@@ -900,11 +919,6 @@ End Try
     End Function
 
     Private Sub LoginCodeButton_Click(sender As Object, e As EventArgs) Handles LoginCodeButton.Click
-        If StartNewInstanceButton.IsButtonDisabled = False Then
-            FakeClipboardContent = ""
-            CurrentLoginCode = Nothing
-            Return
-        End If
         Dim HabboAvatarSettingsUrl As String = "https://www.habbo.com/settings/avatars"
         If Globalization.CultureInfo.CurrentCulture.Name.ToLower.StartsWith("pt") Then
             HabboAvatarSettingsUrl = "https://www.habbo.com.br/settings/avatars"
@@ -934,6 +948,19 @@ End Try
             Process.Start(New ProcessStartInfo(HabboAvatarSettingsUrl) With {.UseShellExecute = True})
         Catch
             'Error while launching habbo avatar settings url
+        End Try
+    End Sub
+
+    Private Sub LoginCodeButton2_Click(sender As Object, e As EventArgs) Handles LoginCodeButton2.Click
+        Try
+            If StartNewInstanceButton.IsButtonDisabled = False Then
+                FakeClipboardContent = ""
+                If CurrentLoginCode.IsFromFakeClipboard = False Then
+                    CleanRealClipboardLoginCode(True)
+                End If
+                Return
+            End If
+        Catch
         End Try
     End Sub
 
@@ -1462,8 +1489,10 @@ Public Class LoginCode
     Public ReadOnly ServerId As String = ""
     Public ReadOnly ServerUrl As String = ""
     Public ReadOnly Username As String = ""
+    Public ReadOnly IsFromFakeClipboard As Boolean = False
 
-    Public Sub New(LoginCode As String)
+    Public Sub New(LoginCode As String, IsFromFakeClipboard As Boolean)
+        Me.IsFromFakeClipboard = IsFromFakeClipboard
         If LoginCode Is Nothing Then
             LoginCode = ""
         End If
@@ -1483,7 +1512,7 @@ Public Class LoginCode
         End If
     End Sub
 
-    Private Function CheckLoginCode(LoginCode As String) As Boolean
+    Public Function CheckLoginCode(LoginCode As String) As Boolean
         If GetCharCount(LoginCode, ".") >= 2 Then
             For Each HabboServer In GetHabboServers()
                 If LoginCode.StartsWith(HabboServer.Id & ".") Then

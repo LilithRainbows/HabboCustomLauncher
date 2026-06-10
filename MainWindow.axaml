@@ -34,7 +34,14 @@
 								<RowDefinition Height="Auto"/>
 								<RowDefinition Height="Auto"/>
 							</Grid.RowDefinitions>
-							<local:CustomButton x:Name="LoginCodeButton" Grid.Row="0" Text="Clipboard login code not detected" BackColor="#3F3F3F" Margin="0,0,0,10" Height="40" IsButtonCornered="False"/>
+							<Grid Grid.Row="0" Margin="0,0,0,10" Height="40">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition />
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<local:CustomButton x:Name="LoginCodeButton" Grid.Row="0" Text="Clipboard login code not detected" BackColor="#3F3F3F" Height="40" IsButtonCornered="False"/>
+								<local:CustomButton IsButtonDisabled="False" x:Name="LoginCodeButton2" Grid.Column="1" Width="30" Text="X" BackColor="#3F3F3F" Margin="5,0,0,0"/>
+							</Grid>
 							<Grid Grid.Row="1" Margin="0,0,0,10" Height="40">
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition />
