@@ -24,6 +24,7 @@ Imports WindowsShortcutFactory
 'SOLUCION: Al hacer click al boton se pregunta para introducir manualmente el codigo (aunque seria innecesario), mejor preguntar que hotel lanzar directamente? o tambien es innecesario? si todo es innecesario capaz convenga hacer que deje de ser un boton y pase a ser un label
 
 Partial Public Class MainWindow : Inherits Window
+    Public IsFullyLoaded As Boolean = False
     Public WithEvents LoadingWindowChild As LoadingWindow
     Private LoadingWindowClientLaunchRequested As Boolean = False
     Private WithEvents Window As Window
@@ -57,6 +58,10 @@ Partial Public Class MainWindow : Inherits Window
     Sub New()
         ' This call is required by the designer
         InitializeComponent()
+    End Sub
+    Private Async Sub MainWindow_Loaded(sender As Object, e As RoutedEventArgs) Handles Me.Loaded
+        Await Task.Yield() 'Ensure window load
+        IsFullyLoaded = True
     End Sub
 
     ' Auto-wiring does not work for VB, so do it manually
@@ -129,8 +134,24 @@ Partial Public Class MainWindow : Inherits Window
 
 
             LoadingWindowClientLaunchRequested = True
-            LaunchClientFromLoadingWindowWithDelay(3)
         End If
+
+        StartFullyLoadWaiter()
+    End Sub
+
+    Public Async Sub StartFullyLoadWaiter()
+        Dim Looped = True
+        Do While Looped
+            Await Task.Delay(50)
+            If IsFullyLoaded Then
+                Looped = False
+                Exit Do
+            End If
+            If LoadingWindowChild IsNot Nothing AndAlso LoadingWindowChild.IsFullyLoaded = True Then
+                Looped = False
+                LaunchClientFromLoadingWindowWithDelay(3)
+            End If
+        Loop
         StartRecursiveClipboardLoginCodeCheckAsync()
     End Sub
 
@@ -205,7 +226,7 @@ Partial Public Class MainWindow : Inherits Window
 
     Private Function DisplayLauncherVersionOnFooter() As String
         FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 30 (10/06/2026)"
+        FooterButton.Text = "CustomLauncher version 31 (14/06/2026)"
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -1171,6 +1192,7 @@ End Try
 
     Private Sub MainWindow_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
         Process.GetCurrentProcess.Kill()
+        IsFullyLoaded = False
     End Sub
 
     Private Sub HabboLogoButton_ContextMenuClosed(sender As Object, e As EventArgs)

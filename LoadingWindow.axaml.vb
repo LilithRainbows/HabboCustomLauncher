@@ -1,10 +1,12 @@
 Imports System.Runtime.InteropServices
 Imports Avalonia.Controls
 Imports Avalonia.Input
+Imports Avalonia.Interactivity
 Imports Avalonia.Markup.Xaml
 Imports Path = System.IO.Path
 
 Partial Public Class LoadingWindow : Inherits Window
+    Public IsFullyLoaded As Boolean = False
     Public MainMenuRequested As Boolean
     Private WithEvents Window As Window
     Private WithEvents TitleBarLabel As Label
@@ -16,6 +18,10 @@ Partial Public Class LoadingWindow : Inherits Window
 
     Sub New()
         InitializeComponent() ' This call is required by the designer
+    End Sub
+    Private Async Sub LoadingWindow_Loaded(sender As Object, e As RoutedEventArgs) Handles Me.Loaded
+        Await Task.Yield() 'Ensure window load
+        IsFullyLoaded = True
     End Sub
 
     ' Auto-wiring does not work for VB, so do it manually
@@ -50,7 +56,7 @@ Partial Public Class LoadingWindow : Inherits Window
             End If
         Next
 
-        StartUpdateProcess()
+        StartUpdateProcess() 'Nuevo: recordar que hay que hacer que solo se ejecute si IsFullyLoaded !!!
     End Sub
 
     Private Async Sub StartUpdateProcess()
@@ -232,6 +238,7 @@ $")"
         Else
             Process.GetCurrentProcess.Kill()
         End If
+        IsFullyLoaded = False
     End Sub
     Public Async Function MsgBox(Title As String, Message As String, Optional ClipboardDebugContent As String = "") As Task(Of Boolean)
         Dim ErrorDialog As New MessageBox()
@@ -242,6 +249,7 @@ $")"
         Await ErrorDialog.ShowDialog(Window)
         Return True
     End Function
+
 End Class
 
 Public Class LauncherUpdaterTranslator

@@ -1,10 +1,12 @@
 ﻿Imports Avalonia.Controls
 Imports Avalonia.Input
+Imports Avalonia.Interactivity
 Imports Avalonia.Markup.Xaml
 Imports Avalonia.Media
 Imports Avalonia.Threading
 Imports Tmds.DBus.Protocol
 Partial Public Class MessageBox : Inherits Window
+    Public IsFullyLoaded As Boolean = False
     Private WithEvents Window As Window
     Private WithEvents TitleBarLabel As Label
     Public WithEvents MessageLabel As TextBlock
@@ -100,5 +102,14 @@ e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Meta)) Then
         AutoAdjustMessageFontSize()
         MessageLabel.Background = Nothing
         CopyMessageToClipboardBusy = False
+    End Sub
+
+    Private Async Sub MessageBox_Loaded(sender As Object, e As RoutedEventArgs) Handles Me.Loaded
+        Await Task.Yield() 'Ensure window load
+        IsFullyLoaded = True
+    End Sub
+
+    Private Sub MessageBox_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
+        IsFullyLoaded = False
     End Sub
 End Class
