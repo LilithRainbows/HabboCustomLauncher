@@ -3,8 +3,6 @@ Imports Avalonia.Input
 Imports Avalonia.Interactivity
 Imports Avalonia.Markup.Xaml
 Imports Avalonia.Media
-Imports Avalonia.Threading
-Imports Tmds.DBus.Protocol
 Partial Public Class MessageBox : Inherits Window
     Public IsFullyLoaded As Boolean = False
     Private WithEvents Window As Window

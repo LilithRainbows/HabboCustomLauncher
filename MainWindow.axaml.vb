@@ -37,14 +37,13 @@ Partial Public Class MainWindow : Inherits Window
     Private WithEvents ChangeUpdateSourceButton As CustomButton
     Private WithEvents ChangeUpdateSourceButton2 As CustomButton
     Private WithEvents HabboLogoButton As Image
-    Private WithEvents GithubButton As Image
-    Private WithEvents SulakeButton As Image
+    Private WithEvents AboutButton As CustomButton
+    Private WithEvents SettingsButton As CustomButton
     Private WithEvents FooterButton As CustomButton
     Public FakeClipboardContent As String
     Public CurrentLoginCode As LoginCode
     Public CurrentClientUrls As JsonClientUrls
     Public CurrentDownloadProgress As Integer
-    Public UpdateSource As String = "AIR_Plus"
     Public CurrentLanguageInt As Integer = 0
     Private HttpClient As New HttpClient()
     Private NamedPipeCancellationTokenSource As CancellationTokenSource
@@ -54,6 +53,7 @@ Partial Public Class MainWindow : Inherits Window
     Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
     Public AirPlusClientURL = "https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf"
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
+    Private LauncherVersion = "32"
 
     Sub New()
         ' This call is required by the designer
@@ -85,12 +85,16 @@ Partial Public Class MainWindow : Inherits Window
         ChangeUpdateSourceButton = Window.FindNameScope.Find("ChangeUpdateSourceButton")
         ChangeUpdateSourceButton2 = Window.FindNameScope.Find("ChangeUpdateSourceButton2")
         HabboLogoButton = Window.FindNameScope.Find("HabboLogoButton")
-        GithubButton = Window.FindNameScope.Find("GithubButton")
-        SulakeButton = Window.FindNameScope.Find("SulakeButton")
+        AboutButton = Window.FindNameScope.Find("AboutButton")
+        SettingsButton = Window.FindNameScope.Find("SettingsButton")
         FooterButton = Window.FindNameScope.Find("FooterButton")
 
-        Singleton.GetCurrentInstance().ScaleMainGrid(Window)
         Singleton.GetCurrentInstance().MainWindow = Me
+        If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+            Singleton.GetCurrentInstance.ClientRenderMode = "gpu"
+        End If
+        Singleton.GetCurrentInstance.LoadSavedDataFromXML()
+        Singleton.GetCurrentInstance().ScaleMainGrid(Window)
 
         StartPipedLoginTicketListener()
 
@@ -117,8 +121,6 @@ Partial Public Class MainWindow : Inherits Window
                 UnixPatchName = "HabboAirOSXPatch.zip"
             End If
         End If
-
-        LoadSavedUpdateSource()
 
         Dim HabboProtocol = Environment.GetCommandLineArgs().FirstOrDefault(Function(x) x.StartsWith("habbo://"), "")
         If HabboProtocol = "" Then
@@ -225,8 +227,9 @@ Partial Public Class MainWindow : Inherits Window
     End Function
 
     Private Function DisplayLauncherVersionOnFooter() As String
-        FooterButton.BackColor = Color.Parse("Transparent")
-        FooterButton.Text = "CustomLauncher version 31 (14/06/2026)"
+        FooterButton.BackColor = Color.Parse("#3FCC00B0")
+        FooterButton.Text = "Launcher version " & LauncherVersion
+        Return ""
     End Function
 
     Private Function DisplayCurrentUserOnFooter() As String
@@ -281,6 +284,12 @@ Partial Public Class MainWindow : Inherits Window
         Try
             StartNewInstanceButton.Text = AppTranslator.CleaningClients(CurrentLanguageInt)
             Await CleanDeprecatedClients()
+
+            Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
+            Dim OriginalXmlPath As String = Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")
+            Dim NewXmlPath As String = Path.Combine(ClientFolderPath, "application.xml")
+            IO.File.Copy(OriginalXmlPath, NewXmlPath, True)
+            UpdateAirApplicationXML()
 
             StartNewInstanceButton.Text = AppTranslator.LaunchingClient(CurrentLanguageInt)
             Dim ClientProcess As New Process
@@ -340,6 +349,15 @@ Partial Public Class MainWindow : Inherits Window
             Await Task.Delay(100)
         Loop
         Await ErrorDialog.ShowDialog(Window)
+        Return True
+    End Function
+
+    Public Async Function OpenSettingsDialog() As Task(Of Boolean)
+        Dim SettingsDialog As New SettingsWindow()
+        Do While Window.IsVisible = False
+            Await Task.Delay(100)
+        Loop
+        Await SettingsDialog.ShowDialog(Window)
         Return True
     End Function
 
@@ -430,7 +448,7 @@ Partial Public Class MainWindow : Inherits Window
         Try
             Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
             Dim ClientFilePath = Path.Combine(ClientFolderPath, "ClientDownload.zip")
-            If UpdateSource = "AIR_Plus" Then
+            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
                 ClientFilePath = Path.Combine(ClientFolderPath, "HabboAir.swf")
             End If
             Dim DownloadingClientHint = AppTranslator.DownloadingClient(CurrentLanguageInt)
@@ -452,7 +470,7 @@ Partial Public Class MainWindow : Inherits Window
             File.Delete(Path.Combine(ClientFolderPath, GetAirPatchNameForCurrentOS))
 
 
-            If UpdateSource = "AIR_Plus" Then
+            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
                 Await Task.Run(Sub() CopyEmbeddedAsset(AirPlusPatchName, ClientFolderPath))
                 Await Task.Run(Sub() UnzipFile(Path.Combine(ClientFolderPath, AirPlusPatchName), ClientFolderPath, True))
                 File.Delete(Path.Combine(ClientFolderPath, AirPlusPatchName))
@@ -525,7 +543,7 @@ Partial Public Class MainWindow : Inherits Window
                 MakeUnixExecutable(Path.Combine(ClientFolderPath, "Habbo")) 'Linux
             End If
 
-            If UpdateSource = "AIR_Plus" Then
+            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
                 Dim AirPlusClientLatestVersion = Await GetRemoteLastModifiedHeaderEpoch(AirPlusClientURL)
                 If CurrentClientUrls.FlashWindowsVersion = AirPlusClientLatestVersion = False Then
                     Throw New Exception("AirPlus remote client version mismatch") 'Es muy poco probable pero este error ocurre si el identificador de la version remota de airplus cambio desde que se inicio el proceso de descarga
@@ -533,7 +551,7 @@ Partial Public Class MainWindow : Inherits Window
             End If
 
             File.WriteAllText(Path.Combine(ClientFolderPath, "VERSION.txt"), CurrentClientUrls.FlashWindowsVersion)
-            If UpdateSource = "AIR_Plus" = False Then
+            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" = False Then
                 AddOrUpdateInstallation(CurrentClientUrls.FlashWindowsVersion, ClientFolderPath, "air", 0)
             End If
 
@@ -625,6 +643,18 @@ Partial Public Class MainWindow : Inherits Window
         xmlDoc = XDocument.Load(NewXmlPath)
         xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "versionLabel").Value = OriginalXmlVersionNumber ' Reemplaza con el nuevo valor
         xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "versionNumber").Value = OriginalXmlVersionNumber ' Reemplaza con el nuevo valor
+
+        Dim initialWindow = xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "initialWindow")
+        Dim requestedDisplayResolution = initialWindow.Elements.FirstOrDefault(Function(x) x.Name.LocalName = "requestedDisplayResolution")
+        Dim renderMode = initialWindow.Elements.FirstOrDefault(Function(x) x.Name.LocalName = "renderMode")
+        If requestedDisplayResolution Is Nothing Then
+            requestedDisplayResolution = New XElement(initialWindow.Name.Namespace + "requestedDisplayResolution", Singleton.GetCurrentInstance().ClientResolution)
+            initialWindow.Add(requestedDisplayResolution)
+        Else
+            requestedDisplayResolution.Value = Singleton.GetCurrentInstance().ClientResolution
+        End If
+        renderMode.Value = Singleton.GetCurrentInstance().ClientRenderMode
+
         If OriginalXmlExtensionsNode IsNot Nothing Then
             Dim NewXmlNamespace As XNamespace = xmlDoc.Root.Name.Namespace
             xmlDoc.Root.Add(New XElement(NewXmlNamespace + OriginalXmlExtensionsNode.Name.LocalName, OriginalXmlExtensionsNode.Elements().Select(Function(e) New XElement(NewXmlNamespace + e.Name.LocalName, e.Value))))
@@ -767,17 +797,17 @@ Partial Public Class MainWindow : Inherits Window
     End Function
 
     Public Async Function CleanDeprecatedClients(Optional ClientsToKeep As Integer = 3) As Task(Of Boolean)
-Try
-            Dim SomethingFailed As Boolean = false
-    Dim ClientPath As String = GetPossibleClientPath("")
-    Dim FoldersToDelete = Directory.GetDirectories(ClientPath).
+        Try
+            Dim SomethingFailed As Boolean = False
+            Dim ClientPath As String = GetPossibleClientPath("")
+            Dim FoldersToDelete = Directory.GetDirectories(ClientPath).
         Where(Function(d) File.Exists(Path.Combine(d, "HabboAir.swf"))).
         OrderByDescending(Function(d) File.GetLastWriteTimeUtc(Path.Combine(d, "HabboAir.swf"))).
         Skip(ClientsToKeep)
-    For Each Folder In FoldersToDelete
-        Try
+            For Each Folder In FoldersToDelete
+                Try
                     Directory.Delete(Folder, True)
-        Catch ex As Exception
+                Catch ex As Exception
                     SomethingFailed = true
         End Try
     Next
@@ -830,14 +860,14 @@ End Try
         Try
             Dim IsClientUpdated As Boolean = False
             StartNewInstanceButton.Text = AppTranslator.ClientUpdatesCheck(CurrentLanguageInt)
-            If UpdateSource = "AIR_Official" Then
+            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Official" Then
                 Try
                     CurrentClientUrls = New JsonClientUrls(Await GetRemoteJsonAsync("https://" & CurrentLoginCode.ServerUrl & "/gamedata/clienturls"))
                 Catch
                     CurrentClientUrls = New JsonClientUrls(("{'flash-windows-version':'" & GetLatestLocalClientVersion() & "','flash-windows':'" & AirPlusClientURL & "'}").Replace("'", Chr(34)))
-                End try
+                End Try
             End If
-            If UpdateSource = "AIR_Plus" Then
+            If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
                 Dim AirPlusClientLatestVersion As String
                 Try
                     AirPlusClientLatestVersion = Await GetRemoteLastModifiedHeaderEpoch(AirPlusClientURL)
@@ -901,29 +931,11 @@ End Try
 
     Public Function GetPossibleClientPath(ClientVersion As String) As String
         Dim ClientType = "air"
-        If UpdateSource = "AIR_Plus" Then
+        If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
             ClientType = "airplus"
         End If
         Return Path.Combine(GetAppDataPath, "Habbo Launcher", "downloads", ClientType, ClientVersion)
     End Function
-
-    Public Sub SaveCurrentUpdateSource()
-        Dim DestinationFolder = Path.Combine(GetAppDataPath, "Habbo Launcher", "downloads")
-        Directory.CreateDirectory(DestinationFolder)
-        IO.File.WriteAllText(Path.Combine(DestinationFolder, "UpdateSource.txt"), UpdateSource)
-    End Sub
-
-    Public Sub LoadSavedUpdateSource()
-        Dim DestinationFile = Path.Combine(GetAppDataPath, "Habbo Launcher", "downloads", "UpdateSource.txt")
-        If File.Exists(DestinationFile) Then
-            Dim SavedSource = File.ReadAllText(DestinationFile)
-            Dim AllowedSources As String() = {"AIR_Plus", "AIR_Official"}
-            If AllowedSources.Contains(SavedSource) Then
-                UpdateSource = SavedSource
-                RefreshUpdateSourceText()
-            End If
-        End If
-    End Sub
 
     Public Async Function GetRemoteJsonAsync(JsonUrl As String) As Task(Of String)
         HttpClient?.Dispose()
@@ -989,7 +1001,7 @@ End Try
 
     Private Sub RefreshUpdateSourceText()
         Dim CurrentUpdateSourceLabel = AppTranslator.CurrentUpdateSource(CurrentLanguageInt)
-        Select Case UpdateSource
+        Select Case Singleton.GetCurrentInstance().UpdateSource
             Case "AIR_Official"
                 ChangeUpdateSourceButton.Text = CurrentUpdateSourceLabel & ": AIR Classic"
             Case "AIR_Plus"
@@ -1000,7 +1012,7 @@ End Try
     End Sub
 
     Public Function GetCurrentUpdateSourceName()
-        Select Case UpdateSource
+        Select Case Singleton.GetCurrentInstance().UpdateSource
             Case "AIR_Official"
                 Return "AIR Classic"
             Case "AIR_Plus"
@@ -1011,13 +1023,13 @@ End Try
     End Function
 
     Private Sub ChangeUpdateSourceButton_Click(sender As Object, e As EventArgs) Handles ChangeUpdateSourceButton.Click
-        Select Case UpdateSource
+        Select Case Singleton.GetCurrentInstance().UpdateSource
             Case "AIR_Official"
-                UpdateSource = "AIR_Plus"
+                Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus"
             Case Else
-                UpdateSource = "AIR_Official"
+                Singleton.GetCurrentInstance().UpdateSource = "AIR_Official"
         End Select
-        SaveCurrentUpdateSource()
+        Singleton.GetCurrentInstance().SaveGlobalSettingsXML()
         RefreshUpdateSourceText()
         'UpdateClientButtonStatus()
     End Sub
@@ -1141,23 +1153,9 @@ End Try
             Catch
                 'Error while launching habbo profile url
             End Try
+        Else
+            Process.Start(New ProcessStartInfo("https://github.com/LilithRainbows/HabboCustomLauncher/releases/latest") With {.UseShellExecute = True})
         End If
-    End Sub
-
-    Private Sub GithubButton_PointerPressed(sender As Object, e As Avalonia.Input.PointerPressedEventArgs) Handles GithubButton.PointerPressed
-        Try
-            Process.Start(New ProcessStartInfo("https://github.com/LilithRainbows/HabboCustomLauncher") With {.UseShellExecute = True})
-        Catch
-            'Error while launching github url
-        End Try
-    End Sub
-
-    Private Sub SulakeButton_PointerPressed(sender As Object, e As Avalonia.Input.PointerPressedEventArgs) Handles SulakeButton.PointerPressed
-        Try
-            Process.Start(New ProcessStartInfo("https://www.sulake.com/habbo/") With {.UseShellExecute = True})
-        Catch
-            'Error while launching sulake url
-        End Try
     End Sub
 
     Private Sub HabboLogoButton_PointerEntered(sender As Object, e As Avalonia.Input.PointerEventArgs) Handles HabboLogoButton.PointerEntered
@@ -1174,24 +1172,10 @@ End Try
         HabboLogoButton.Source = New Bitmap(AssetLoader.Open(New Uri("avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/habbo-logo-big.png")))
     End Sub
 
-    Private Sub GithubButton_PointerEntered(sender As Object, e As Avalonia.Input.PointerEventArgs) Handles GithubButton.PointerEntered
-        GithubButton.Source = New Bitmap(AssetLoader.Open(New Uri("avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/github-icon-2.png")))
-    End Sub
-
-    Private Sub GithubButton_PointerExited(sender As Object, e As Avalonia.Input.PointerEventArgs) Handles GithubButton.PointerExited
-        GithubButton.Source = New Bitmap(AssetLoader.Open(New Uri("avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/github-icon.png")))
-    End Sub
-
-    Private Sub SulakeButtonButton_PointerEntered(sender As Object, e As Avalonia.Input.PointerEventArgs) Handles SulakeButton.PointerEntered
-        SulakeButton.Source = New Bitmap(AssetLoader.Open(New Uri("avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/habbo-footer-2.png")))
-    End Sub
-
-    Private Sub SulakeButtonButton_PointerExited(sender As Object, e As Avalonia.Input.PointerEventArgs) Handles SulakeButton.PointerExited
-        SulakeButton.Source = New Bitmap(AssetLoader.Open(New Uri("avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/habbo-footer.png")))
-    End Sub
-
     Private Sub MainWindow_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
-        Process.GetCurrentProcess.Kill()
+        If Design.IsDesignMode = False Then
+            Process.GetCurrentProcess.Kill()
+        End If
         IsFullyLoaded = False
     End Sub
 
@@ -1301,7 +1285,7 @@ End Try
 
     Private Sub ChangeUpdateSourceButton2_Click(sender As Object, e As EventArgs) Handles ChangeUpdateSourceButton2.Click
         Dim ClientHint As String = AppTranslator.ClassicAirClientHint(CurrentLanguageInt)
-        If UpdateSource = "AIR_Plus" Then
+        If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
             ClientHint = AppTranslator.AirPlusClientHint(CurrentLanguageInt)
         End If
         MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), ClientHint)
@@ -1494,6 +1478,29 @@ End Try
         Return False
 
     End Function
+
+    Private Sub AboutButton_Click(sender As Object, e As EventArgs) Handles AboutButton.Click
+        MsgBox("About", "Launcher version: " & LauncherVersion & vbNewLine & "Edited by Lilith." & vbNewLine & "Sulake Oy. All rights reserved." & vbNewLine & "This project is not endorsed by or affiliated with Sulake Oy.")
+    End Sub
+
+    Private Sub SettingsButton_Click(sender As Object, e As EventArgs) Handles SettingsButton.Click
+        OpenSettingsDialog()
+    End Sub
+
+    Private Sub AboutButton_PointerEntered(sender As Object, e As Input.PointerEventArgs) Handles AboutButton.PointerEntered
+        AboutButton.Foreground = New SolidColorBrush(Color.Parse("#9FFFFFFF")) 'New SolidColorBrush(Color.Parse("#9FCC00B0"))
+    End Sub
+
+    Private Sub AboutButton_PointerExited(sender As Object, e As Input.PointerEventArgs) Handles AboutButton.PointerExited
+        AboutButton.Foreground = New SolidColorBrush(Color.Parse("#4FFFFFFF"))
+    End Sub
+
+    Private Sub SettingsButton_PointerEntered(sender As Object, e As Input.PointerEventArgs) Handles SettingsButton.PointerEntered
+        SettingsButton.Foreground = New SolidColorBrush(Color.Parse("#9FFFFFFF")) 'New SolidColorBrush(Color.Parse("#9FCC00B0"))
+    End Sub
+    Private Sub SettingsButton_PointerExited(sender As Object, e As Input.PointerEventArgs) Handles SettingsButton.PointerExited
+        SettingsButton.Foreground = New SolidColorBrush(Color.Parse("#4FFFFFFF"))
+    End Sub
 
 End Class
 

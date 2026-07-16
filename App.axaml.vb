@@ -20,13 +20,6 @@ Partial Public Class App
         If desktop IsNot Nothing Then
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown
 
-            Dim CustomWindowScale = Environment.GetCommandLineArgs().FirstOrDefault(Function(x) x.StartsWith("-scale="), 0)
-            CustomWindowScale = CustomWindowScale.Replace("-scale=", "")
-            If IsNumeric(CustomWindowScale) = False Then
-                CustomWindowScale = 0
-            End If
-            Singleton.GetCurrentInstance().CustomWindowScale = Double.Parse(CustomWindowScale, CultureInfo.InvariantCulture)
-
             If IsAppAlreadyRunning() Then
                 HandleAppAlreadyRunning()
             Else

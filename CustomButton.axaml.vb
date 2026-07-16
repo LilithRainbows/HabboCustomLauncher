@@ -26,6 +26,30 @@ Partial Public Class CustomButton : Inherits UserControl
         UpdateButtonCorner()
     End Sub
 
+    Public Shared ReadOnly ButtonPaddingProperty As AvaloniaProperty(Of Thickness) =
+        AvaloniaProperty.Register(Of CustomButton, Thickness)(NameOf(ButtonPadding))
+
+    Public Property ButtonPadding As Thickness
+        Get
+            Return GetValue(ButtonPaddingProperty)
+        End Get
+        Set
+            SetValue(ButtonPaddingProperty, Value)
+        End Set
+    End Property
+
+    Public Shared ReadOnly IconProperty As AvaloniaProperty(Of Geometry) =
+    AvaloniaProperty.Register(Of CustomButton, Geometry)(NameOf(Icon))
+
+    Public Property Icon As Geometry
+        Get
+            Return GetValue(IconProperty)
+        End Get
+        Set(value As Geometry)
+            SetValue(IconProperty, value)
+        End Set
+    End Property
+
     Public Shared ReadOnly TextProperty As AvaloniaProperty(Of String) =
             AvaloniaProperty.Register(Of CustomButton, String)(NameOf(Text))
 

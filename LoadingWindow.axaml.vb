@@ -236,7 +236,9 @@ $")"
             GetMainWindow.Show()
             GetMainWindow.LoadingWindowChild = Nothing
         Else
-            Process.GetCurrentProcess.Kill()
+            If Design.IsDesignMode = False Then
+                Process.GetCurrentProcess.Kill()
+            End If
         End If
         IsFullyLoaded = False
     End Sub
