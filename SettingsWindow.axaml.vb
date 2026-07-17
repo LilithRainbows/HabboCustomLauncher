@@ -13,6 +13,7 @@ Partial Public Class SettingsWindow : Inherits Window
     Private WithEvents LauncherScalingUpDown As NumericUpDown
     Private WithEvents LauncherScalingResetButton As CustomButton
     Private WithEvents LauncherScalingHelpButton As CustomButton
+    Private WithEvents ClientAirVersionButton As CustomButton
     Private WithEvents ClientRenderModeButton As CustomButton
     Private WithEvents ClientResolutionButton As CustomButton
     Private WithEvents ClientRenderResetButton As CustomButton
@@ -42,12 +43,13 @@ Partial Public Class SettingsWindow : Inherits Window
         LauncherScalingUpDown = FindNameScope().Find("LauncherScalingUpDown")
         LauncherScalingResetButton = FindNameScope().Find("LauncherScalingResetButton")
         LauncherScalingHelpButton = FindNameScope().Find("LauncherScalingHelpButton")
+        ClientAirVersionButton = FindNameScope().Find("ClientAirVersionButton")
+        ClientAirVersionButton.IsVisible = RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
         ClientRenderModeButton = FindNameScope().Find("ClientRenderModeButton")
         ClientResolutionButton = FindNameScope().Find("ClientResolutionButton")
         ClientRenderResetButton = FindNameScope().Find("ClientRenderResetButton")
         ClientRenderHelpButton = FindNameScope().Find("ClientRenderHelpButton")
         Singleton.GetCurrentInstance().ScaleMainGrid(Window)
-
         ShowSavedSettings()
     End Sub
 
@@ -57,11 +59,18 @@ Partial Public Class SettingsWindow : Inherits Window
 
     Private Sub OkButton_Click(sender As Object, e As EventArgs) Handles OkButton.Click
         Singleton.GetCurrentInstance().CustomWindowScale = LauncherScalingUpDown.Value / 100
-        With ClientResolutionButton
-            Singleton.GetCurrentInstance().ClientResolution = .Text.ToLower.Remove(0, .Text.LastIndexOf(" ") + 1)
+        With ClientAirVersionButton
+            If .Text.ToLower.Remove(0, .Text.LastIndexOf(" ") + 1) = "50" Then
+                Singleton.GetCurrentInstance().ClientAirVersion = "old"
+            Else
+                Singleton.GetCurrentInstance().ClientAirVersion = "latest"
+            End If
         End With
         With ClientRenderModeButton
             Singleton.GetCurrentInstance().ClientRenderMode = .Text.ToLower.Remove(0, .Text.LastIndexOf(" ") + 1)
+        End With
+        With ClientResolutionButton
+            Singleton.GetCurrentInstance().ClientResolution = .Text.ToLower.Remove(0, .Text.LastIndexOf(" ") + 1)
         End With
         Singleton.GetCurrentInstance().SaveGlobalSettingsXML()
         Singleton.GetCurrentInstance().ScaleMainGrid(Singleton.GetCurrentInstance().MainWindow)
@@ -102,11 +111,11 @@ Partial Public Class SettingsWindow : Inherits Window
     End Function
 
     Private Sub LauncherScalingHelpButton_Click(sender As Object, e As EventArgs) Handles LauncherScalingHelpButton.Click
-        MsgBox("Example", "Launcher scaling help button clicked!")
+        'MsgBox("Example", "Launcher scaling help button clicked!")
     End Sub
 
     Private Sub ClientRenderHelpButton_Click(sender As Object, e As EventArgs) Handles ClientRenderHelpButton.Click
-        MsgBox("Example", "Client rendering help button clicked!")
+        'MsgBox("Example", "Client rendering help button clicked!")
     End Sub
 
     Private Sub ClientRenderModeButton_Click(sender As Object, e As EventArgs) Handles ClientRenderModeButton.Click
@@ -125,6 +134,12 @@ Partial Public Class SettingsWindow : Inherits Window
     Private Sub ShowSavedSettings()
         With Singleton.GetCurrentInstance()
             LauncherScalingUpDown.Value = .CustomWindowScale * 100
+            Select Case .ClientAirVersion
+                Case "latest"
+                    ClientAirVersionButton.Text = "AIR: 51"
+                Case "old"
+                    ClientAirVersionButton.Text = "AIR: 50"
+            End Select
             Select Case .ClientRenderMode
                 Case "gpu"
                     ClientRenderModeButton.Text = "Mode: GPU"
@@ -159,10 +174,26 @@ Partial Public Class SettingsWindow : Inherits Window
 
     Private Sub ClientRenderResetButton_Click(sender As Object, e As EventArgs) Handles ClientRenderResetButton.Click
         If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+            If OperatingSystem.IsMacOSVersionAtLeast(26, 0) Then
+                ClientAirVersionButton.Text = "AIR: 51"
+            Else
+                ClientAirVersionButton.Text = "AIR: 50"
+            End If
             ClientRenderModeButton.Text = "Mode: GPU"
         Else
             ClientRenderModeButton.Text = "Mode: CPU"
         End If
         ClientResolutionButton.Text = "Resolution: Standard"
+    End Sub
+
+    Private Sub ClientAirVersionButton_Click(sender As Object, e As EventArgs) Handles ClientAirVersionButton.Click
+        With ClientAirVersionButton
+            Select Case .Text.ToLower.Remove(0, .Text.LastIndexOf(" ") + 1)
+                Case "51"
+                    .Text = "AIR: 50"
+                Case "50"
+                    .Text = "AIR: 51"
+            End Select
+        End With
     End Sub
 End Class

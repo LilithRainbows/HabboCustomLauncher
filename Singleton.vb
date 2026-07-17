@@ -22,6 +22,7 @@ Public Class Singleton
     ' ================================
     Public UpdateSource As String = "AIR_Plus"
     Public CustomWindowScale As Double = 1 '(1 = 100% or autohdpi for win7/8/8.1)
+    Public ClientAirVersion As String = "latest" '(can be old for osx)
     Public ClientRenderMode As String = "cpu" '(gpu for osx)
     Public ClientResolution As String = "standard"
 
@@ -92,6 +93,9 @@ Public Class Singleton
                 If SettingName = "CustomWindowScale" Then
                     CustomWindowScale = Convert.ToDouble(SettingValue)
                 End If
+                If SettingName = "ClientAirVersion" Then
+                    ClientAirVersion = Convert.ToString(SettingValue)
+                End If
                 If SettingName = "ClientRenderMode" Then
                     ClientRenderMode = Convert.ToString(SettingValue)
                 End If
@@ -107,6 +111,7 @@ Public Class Singleton
         Dim GlobalSettings As New Dictionary(Of String, String)
         GlobalSettings.Add("UpdateSource", UpdateSource)
         GlobalSettings.Add("CustomWindowScale", CustomWindowScale)
+        GlobalSettings.Add("ClientAirVersion", ClientAirVersion)
         GlobalSettings.Add("ClientRenderMode", ClientRenderMode)
         GlobalSettings.Add("ClientResolution", ClientResolution)
         Using XmlWriter As New XmlTextWriter(Path.Combine(GetLauncherDownloadFolder, "GlobalSettings.xml"), Text.Encoding.UTF8)

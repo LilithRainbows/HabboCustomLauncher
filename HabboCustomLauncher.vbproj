@@ -69,6 +69,7 @@
     <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
     <PackageReference Include="Avalonia.Desktop" Version="11.2.0" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.0" />
+    <PackageReference Include="System.IO.Hashing" Version="10.0.10" />
     <PackageReference Include="WindowsShortcutFactory" Version="1.2.0" />
   </ItemGroup>
 

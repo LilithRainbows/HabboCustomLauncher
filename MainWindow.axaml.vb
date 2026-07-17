@@ -1,6 +1,7 @@
 Imports System.Globalization
 Imports System.IO
 Imports System.IO.Compression
+Imports System.IO.Hashing
 Imports System.IO.Pipes
 Imports System.Net.Http
 Imports System.Reflection
@@ -47,13 +48,11 @@ Partial Public Class MainWindow : Inherits Window
     Public CurrentLanguageInt As Integer = 0
     Private HttpClient As New HttpClient()
     Private NamedPipeCancellationTokenSource As CancellationTokenSource
-    Public UnixPatchName As String = "HabboAirLinuxPatch_x64.zip" 'Depending on the platform, it can automatically become HabboAirLinuxPatch_x64.zip and HabboAirOSXPatch.zip
-    Public WindowsPatchName As String = "HabboAirWindowsPatch_x86.zip" 'Depending on the architecture, it can automatically become HabboAirWindowsPatch_x64.zip
     Public AirPlusPatchName As String = "HabboAirPlusPatch.zip"
     Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
     Public AirPlusClientURL = "https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf"
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
-    Private LauncherVersion = "32"
+    Private LauncherVersion = "33"
 
     Sub New()
         ' This call is required by the designer
@@ -91,6 +90,11 @@ Partial Public Class MainWindow : Inherits Window
 
         Singleton.GetCurrentInstance().MainWindow = Me
         If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+            If OperatingSystem.IsMacOSVersionAtLeast(26, 0) Then
+                Singleton.GetCurrentInstance.ClientAirVersion = "latest"
+            Else
+                Singleton.GetCurrentInstance.ClientAirVersion = "old"
+            End If
             Singleton.GetCurrentInstance.ClientRenderMode = "gpu"
         End If
         Singleton.GetCurrentInstance.LoadSavedDataFromXML()
@@ -107,20 +111,6 @@ Partial Public Class MainWindow : Inherits Window
         RefreshUpdateSourceText()
         FixWindowsTLS()
         RegisterHabboProtocol()
-
-        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) AndAlso RuntimeInformation.OSArchitecture = Architecture.X64 Then
-            WindowsPatchName = "HabboAirWindowsPatch_x64.zip"
-        End If
-        If (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) Or RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD)) AndAlso RuntimeInformation.ProcessArchitecture = Architecture.Arm64 Then
-            UnixPatchName = "HabboAirLinuxPatch_arm64.zip"
-        End If
-        If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
-            If OperatingSystem.IsMacOSVersionAtLeast(26, 0) Then
-                UnixPatchName = "HabboAirOSXTahoePatch.zip"
-            Else
-                UnixPatchName = "HabboAirOSXPatch.zip"
-            End If
-        End If
 
         Dim HabboProtocol = Environment.GetCommandLineArgs().FirstOrDefault(Function(x) x.StartsWith("habbo://"), "")
         If HabboProtocol = "" Then
@@ -140,6 +130,22 @@ Partial Public Class MainWindow : Inherits Window
 
         StartFullyLoadWaiter()
     End Sub
+
+    Public Shared Function GetAssetHash(assetName As String) As String
+        Dim resourceName = "avares://" & Assembly.GetExecutingAssembly().GetName().Name & "/Assets/" & assetName
+        Using resourceStream As Stream = AssetLoader.Open(New Uri(resourceName))
+            Dim hasher As New XxHash3()
+            Dim buffer(8191) As Byte
+            While True
+                Dim read = resourceStream.Read(buffer, 0, buffer.Length)
+                If read = 0 Then Exit While
+                hasher.Append(buffer.AsSpan(0, read))
+            End While
+            Dim hash(7) As Byte ' XXH3-64 = 8 bytes
+            hasher.GetCurrentHash(hash)
+            Return Convert.ToHexString(hash)
+        End Using
+    End Function
 
     Public Async Sub StartFullyLoadWaiter()
         Dim Looped = True
@@ -201,9 +207,25 @@ Partial Public Class MainWindow : Inherits Window
 
     Public Function GetAirPatchNameForCurrentOS() As String
         If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
-            Return WindowsPatchName
-        Else
-            Return UnixPatchName
+            If RuntimeInformation.OSArchitecture = Architecture.X86 Then
+                Return "HabboAirWindowsPatch_x86.zip"
+            Else
+                Return "HabboAirWindowsPatch_x64.zip"
+            End If
+        End If
+        If RuntimeInformation.IsOSPlatform(OSPlatform.Linux) Or RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD) Then
+            If RuntimeInformation.ProcessArchitecture = Architecture.Arm64 Then
+                Return "HabboAirLinuxPatch_arm64.zip"
+            Else
+                Return "HabboAirLinuxPatch_x64.zip"
+            End If
+        End If
+        If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+            If Singleton.GetCurrentInstance().ClientAirVersion = "latest" Then
+                Return "HabboAirOSXTahoePatch.zip"
+            Else
+                Return "HabboAirOSXPatch.zip"
+            End If
         End If
     End Function
 
@@ -453,6 +475,9 @@ Partial Public Class MainWindow : Inherits Window
             End If
             Dim DownloadingClientHint = AppTranslator.DownloadingClient(CurrentLanguageInt)
             StartNewInstanceButton.Text = DownloadingClientHint
+            If Directory.Exists(ClientFolderPath) Then
+                Directory.Delete(ClientFolderPath, True)
+            End If
             Directory.CreateDirectory(ClientFolderPath)
 
 
@@ -550,6 +575,7 @@ Partial Public Class MainWindow : Inherits Window
                 End If
             End If
 
+            File.WriteAllText(Path.Combine(ClientFolderPath, "AIR_HASH.txt"), GetAssetHash(GetAirPatchNameForCurrentOS))
             File.WriteAllText(Path.Combine(ClientFolderPath, "VERSION.txt"), CurrentClientUrls.FlashWindowsVersion)
             If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" = False Then
                 AddOrUpdateInstallation(CurrentClientUrls.FlashWindowsVersion, ClientFolderPath, "air", 0)
@@ -655,10 +681,23 @@ Partial Public Class MainWindow : Inherits Window
         End If
         renderMode.Value = Singleton.GetCurrentInstance().ClientRenderMode
 
+        'If OriginalXmlExtensionsNode IsNot Nothing Then
+        '    Dim NewXmlNamespace As XNamespace = xmlDoc.Root.Name.Namespace
+        '    xmlDoc.Root.Add(New XElement(NewXmlNamespace + OriginalXmlExtensionsNode.Name.LocalName, OriginalXmlExtensionsNode.Elements().Select(Function(e) New XElement(NewXmlNamespace + e.Name.LocalName, e.Value))))
+        'End If
+
         If OriginalXmlExtensionsNode IsNot Nothing Then
-            Dim NewXmlNamespace As XNamespace = xmlDoc.Root.Name.Namespace
-            xmlDoc.Root.Add(New XElement(NewXmlNamespace + OriginalXmlExtensionsNode.Name.LocalName, OriginalXmlExtensionsNode.Elements().Select(Function(e) New XElement(NewXmlNamespace + e.Name.LocalName, e.Value))))
+            Dim ns As XNamespace = xmlDoc.Root.Name.Namespace
+            Dim existingExtensions = xmlDoc.Root.Elements().FirstOrDefault(Function(x) x.Name.LocalName = "extensions")
+            Dim newExtensions = New XElement(ns + "extensions", OriginalXmlExtensionsNode.Elements().Select(Function(e) New XElement(ns + e.Name.LocalName, e.Value)))
+            If existingExtensions Is Nothing Then
+                xmlDoc.Root.Add(newExtensions)
+            Else
+                existingExtensions.ReplaceWith(newExtensions)
+            End If
         End If
+
+
         xmlDoc.Save(OriginalXmlPath)
         File.Delete(NewXmlPath)
     End Sub
@@ -845,7 +884,7 @@ End Try
                 ClientVersion = CurrentClientUrls.FlashWindowsVersion
             End If
             Dim ClientPath = GetPossibleClientPath(ClientVersion)
-            Return Directory.Exists(ClientPath) AndAlso (File.Exists(Path.Combine(ClientPath, "VERSION.txt")) OrElse InstallationExists(ClientVersion, "air"))
+            Return Directory.Exists(ClientPath) AndAlso File.Exists(Path.Combine(ClientPath, "AIR_HASH.txt")) AndAlso File.ReadAllText(Path.Combine(ClientPath, "AIR_HASH.txt")) = GetAssetHash(GetAirPatchNameForCurrentOS)
         Catch
             Return False
         End Try
@@ -1041,6 +1080,9 @@ End Try
             For Each ClientVersionFolder In Directory.GetDirectories(ClientsDirectory)
                 Try
                     Directory.Delete(ClientVersionFolder, True)
+                    If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" = False Then
+                        RemoveInstallation(New DirectoryInfo(ClientVersionFolder).Name, "air")
+                    End If
                 Catch ex As Exception
                     ErrorsList.Add(ex.GetType.Name & ": " & ex.Message)
                 End Try
@@ -1445,7 +1487,7 @@ End Try
 
         For i As Integer = installations.Count - 1 To 0 Step -1
             Dim item As JsonObject = installations(i)
-            If item("version")?.ToString() = version AndAlso item("client")?.ToString() = client Then
+            If (item("version")?.ToString() = version Or version = "") AndAlso item("client")?.ToString() = client Then
                 installations.RemoveAt(i)
             End If
         Next
