@@ -52,7 +52,7 @@ Partial Public Class MainWindow : Inherits Window
     Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
     Public AirPlusClientURL = "https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf"
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
-    Private LauncherVersion = "33"
+    Private LauncherVersion = "34"
 
     Sub New()
         ' This call is required by the designer
@@ -306,12 +306,19 @@ Partial Public Class MainWindow : Inherits Window
         Try
             StartNewInstanceButton.Text = AppTranslator.CleaningClients(CurrentLanguageInt)
             Await CleanDeprecatedClients()
-
             Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
+            If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then 'OSX
+                ClientFolderPath = Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Resources")
+            End If
             Dim OriginalXmlPath As String = Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")
             Dim NewXmlPath As String = Path.Combine(ClientFolderPath, "application.xml")
             IO.File.Copy(OriginalXmlPath, NewXmlPath, True)
-            UpdateAirApplicationXML()
+            UpdateAirApplicationXML(IsFromPostInstall:=True)
+            If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) AndAlso Singleton.GetCurrentInstance().ClientAirVersion = "old" Then
+                ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 50) 'OSX is limited to AIR version 50.2.3.8 to improve performance and provide compatibility with OSX 10.12+, so the swf version will be forced to 50
+            Else
+                ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 51) 'OSX Tahoe and later needs AIR 51+ to avoid keyboard shortcuts bugs /// 'Windows and Linux works with AIR 51+
+            End If
 
             StartNewInstanceButton.Text = AppTranslator.LaunchingClient(CurrentLanguageInt)
             Dim ClientProcess As New Process
@@ -451,11 +458,21 @@ Partial Public Class MainWindow : Inherits Window
         End Using
     End Sub
 
-    Sub ReplaceSwfVersion(rutaArchivo As String, nuevoValorInt As Integer)
-        Dim datos As Byte() = File.ReadAllBytes(rutaArchivo)
-        datos(3) = CByte(nuevoValorInt)
-        File.WriteAllBytes(rutaArchivo, datos)
+    Sub ReplaceSwfVersion(swfPath As String, newversion As Integer)
+        If GetSwfVersion(swfPath) = newversion = False Then
+            Dim SwfBytes As Byte() = File.ReadAllBytes(swfPath)
+            SwfBytes(3) = CByte(newversion)
+            File.WriteAllBytes(swfPath, SwfBytes)
+        End If
     End Sub
+
+    Function GetSwfVersion(swfPath As String) As Integer
+        Using br As New BinaryReader(File.OpenRead(swfPath))
+            br.BaseStream.Seek(3, SeekOrigin.Begin)
+            Return br.ReadByte()
+        End Using
+        Throw New Exception("GetSwfVersion failed!")
+    End Function
 
     Function GetSwfType(SwfPath As String) As String
         Using br As New BinaryReader(File.OpenRead(SwfPath))
@@ -509,7 +526,7 @@ Partial Public Class MainWindow : Inherits Window
                 End If
             End If
 
-            UpdateAirApplicationXML()
+            UpdateAirApplicationXML(IsFromPostInstall:=False)
 
             If IO.File.ReadAllText(Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")).Contains("<extensions>") Then
                 If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
@@ -531,14 +548,10 @@ Partial Public Class MainWindow : Inherits Window
                 IO.File.Move(AirCustomLicensePath, Path.Combine(ClientFolderPath, "META-INF", "AIR", "license.txt"), True)
             End If
 
-            If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
-                If OperatingSystem.IsMacOSVersionAtLeast(26, 0) Then
-                    ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 51) 'OSX Tahoe and later needs AIR 51+ to avoid keyboard shortcuts bugs
-                Else
-                    ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 50) 'OSX is limited to AIR version 50.2.3.8 to improve performance and provide compatibility with OSX 10.12+, so the swf version will be forced to 50
-                End If
+            If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) AndAlso Singleton.GetCurrentInstance().ClientAirVersion = "old" Then
+                ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 50) 'OSX is limited to AIR version 50.2.3.8 to improve performance and provide compatibility with OSX 10.12+, so the swf version will be forced to 50
             Else
-                ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 51) 'Windows and Linux works with AIR 51+
+                ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 51) 'OSX Tahoe and later needs AIR 51+ to avoid keyboard shortcuts bugs /// 'Windows and Linux works with AIR 51+
             End If
 
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
@@ -648,8 +661,11 @@ Partial Public Class MainWindow : Inherits Window
         End If
     End Sub
 
-    Public Sub UpdateAirApplicationXML()
+    Public Sub UpdateAirApplicationXML(IsFromPostInstall As Boolean)
         Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
+        If IsFromPostInstall AndAlso RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then 'OSX
+            ClientFolderPath = Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Resources")
+        End If
         Dim OriginalXmlPath As String = Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")
         Dim OriginalXmlVersionNumber As String
         Dim OriginalXmlExtensionsNode As XElement

@@ -111,11 +111,15 @@ Partial Public Class SettingsWindow : Inherits Window
     End Function
 
     Private Sub LauncherScalingHelpButton_Click(sender As Object, e As EventArgs) Handles LauncherScalingHelpButton.Click
-        'MsgBox("Example", "Launcher scaling help button clicked!")
+        MsgBox("Information", "Adjust the launcher UI scale manually." & vbNewLine & "This option does not affect the client.")
     End Sub
 
     Private Sub ClientRenderHelpButton_Click(sender As Object, e As EventArgs) Handles ClientRenderHelpButton.Click
-        'MsgBox("Example", "Client rendering help button clicked!")
+        If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+            MsgBox("Information", "Mode: GPU is recommended on macOS to avoid graphical issues, but it may reduce performance due to the client's lack of GPU acceleration." & vbNewLine & "Resolution: Standard uses OS scaling. High uses full resolution." & vbNewLine & "Version: 50 is faster, but breaks clipboard support on macOS Tahoe and later.")
+        Else
+            MsgBox("Information", "Mode: CPU is recommended due to the client's lack of GPU acceleration." & vbNewLine & "Resolution: Standard uses OS scaling. High uses full resolution.")
+        End If
     End Sub
 
     Private Sub ClientRenderModeButton_Click(sender As Object, e As EventArgs) Handles ClientRenderModeButton.Click
