@@ -1,0 +1,72 @@
+name: Build HabboCustomLauncher
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: win-x86
+            name: Windows x86
+            os: windows-latest
+            output_name: HabboCustomLauncher_Win_x86
+            artifact_path: bin/PublishRelease/HabboCustomLauncher.exe
+
+          - profile: linux-x64
+            name: Linux x64
+            os: ubuntu-latest
+            output_name: HabboCustomLauncher_Linux_x64
+            artifact_path: bin/PublishRelease/HabboCustomLauncher_Linux_x64
+
+          - profile: linux-arm64
+            name: Linux ARM64
+            os: ubuntu-latest
+            output_name: HabboCustomLauncher_Linux_arm64
+            artifact_path: bin/PublishRelease/HabboCustomLauncher_Linux_arm64
+
+          - profile: osx-x64
+            name: macOS x64
+            os: macos-latest
+            output_name: HabboCustomLauncher_OSX_x64
+            artifact_path: bin/PublishRelease/HabboCustomLauncher_OSX_x64
+
+          - profile: osx-arm64
+            name: macOS ARM64
+            os: macos-latest
+            output_name: HabboCustomLauncher_OSX_arm64
+            artifact_path: bin/PublishRelease/HabboCustomLauncher_OSX_arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Publish
+        run: >
+          dotnet publish HabboCustomLauncher.vbproj
+          -c Release
+          -p:WarningLevel=0
+          -p:CheckEolTargetFramework=false
+          -p:PublishProfileFullPath="${{ github.workspace }}/My Project/PublishProfiles/${{ matrix.profile }}.pubxml"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
