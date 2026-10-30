@@ -116,7 +116,7 @@ Partial Public Class SettingsWindow : Inherits Window
 
     Private Sub ClientRenderHelpButton_Click(sender As Object, e As EventArgs) Handles ClientRenderHelpButton.Click
         If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
-            MsgBox("Information", "Mode: GPU is recommended on macOS to avoid graphical issues, but it may reduce performance due to the client's lack of GPU acceleration." & vbNewLine & "Resolution: Standard uses OS scaling. High uses full resolution." & vbNewLine & "Version: 50 is faster, but breaks clipboard support on macOS Tahoe and later.")
+            MsgBox("Information", "Mode: GPU is recommended on macOS to avoid graphical issues, but it may reduce performance due to the client's lack of GPU acceleration." & vbNewLine & "Resolution: Standard uses OS scaling. High uses full resolution." & vbNewLine & "Version: 51 is recommended for Tahoe and later. Use 50 if unsupported.")
         Else
             MsgBox("Information", "Mode: CPU is recommended due to the client's lack of GPU acceleration." & vbNewLine & "Resolution: Standard uses OS scaling. High uses full resolution.")
         End If

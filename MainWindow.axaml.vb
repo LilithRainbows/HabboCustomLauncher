@@ -51,8 +51,8 @@ Partial Public Class MainWindow : Inherits Window
     Public AirPlusPatchName As String = "HabboAirPlusPatch.zip"
     Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
     Public AirPlusClientURL = "https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf"
-    Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HabboLauncher/1.0.41 Chrome/87.0.4280.141 Electron/11.3.0 Safari/537.36"
-    Private LauncherVersion = "34"
+    Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+    Private LauncherVersion = "35"
 
     Sub New()
         ' This call is required by the designer
@@ -222,9 +222,9 @@ Partial Public Class MainWindow : Inherits Window
         End If
         If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
             If Singleton.GetCurrentInstance().ClientAirVersion = "latest" Then
-                Return "HabboAirOSXTahoePatch.zip"
+                Return "HabboAirOSXPatch_latest.zip"
             Else
-                Return "HabboAirOSXPatch.zip"
+                Return "HabboAirOSXPatch_old.zip"
             End If
         End If
     End Function
@@ -315,7 +315,7 @@ Partial Public Class MainWindow : Inherits Window
             IO.File.Copy(OriginalXmlPath, NewXmlPath, True)
             UpdateAirApplicationXML(IsFromPostInstall:=True)
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) AndAlso Singleton.GetCurrentInstance().ClientAirVersion = "old" Then
-                ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 50) 'OSX is limited to AIR version 50.2.3.8 to improve performance and provide compatibility with OSX 10.12+, so the swf version will be forced to 50
+                ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 50) 'OSX old is limited to AIR version 50.2.3.8 to improve performance and provide compatibility with OSX 10.12+, so the swf version will be forced to 50
             Else
                 ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 51) 'OSX Tahoe and later needs AIR 51+ to avoid keyboard shortcuts bugs /// 'Windows and Linux works with AIR 51+
             End If
@@ -399,6 +399,16 @@ Partial Public Class MainWindow : Inherits Window
         process.Start()
         process.WaitForExit()
     End Function
+
+    Sub RemoveExtendedAttributes(filePath As String)
+        Dim p As New Process()
+        p.StartInfo.FileName = "/usr/bin/xattr"
+        p.StartInfo.Arguments = $"-cr ""{filePath}"""
+        p.StartInfo.UseShellExecute = False
+        p.StartInfo.CreateNoWindow = True
+        p.Start()
+        p.WaitForExit()
+    End Sub
 
     Sub CodesignFile(filePath As String)
         Dim p As New Process()
@@ -493,6 +503,9 @@ Partial Public Class MainWindow : Inherits Window
             Dim DownloadingClientHint = AppTranslator.DownloadingClient(CurrentLanguageInt)
             StartNewInstanceButton.Text = DownloadingClientHint
             If Directory.Exists(ClientFolderPath) Then
+                If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
+                    Await KillProcessByPathAsync(Path.Combine(ClientFolderPath, "Habbo.exe"))
+                End If
                 Directory.Delete(ClientFolderPath, True)
             End If
             Directory.CreateDirectory(ClientFolderPath)
@@ -528,20 +541,21 @@ Partial Public Class MainWindow : Inherits Window
 
             UpdateAirApplicationXML(IsFromPostInstall:=False)
 
-            If IO.File.ReadAllText(Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")).Contains("<extensions>") Then
-                If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
-                    Dim HabboAirExtensionsOSXPatchName = "HabboAirExtensionsOSXPatch.zip"
-                    Await Task.Run(Sub() CopyEmbeddedAsset(HabboAirExtensionsOSXPatchName, ClientFolderPath))
-                    Await Task.Run(Sub() UnzipFile(Path.Combine(ClientFolderPath, HabboAirExtensionsOSXPatchName), ClientFolderPath, True))
-                    File.Delete(Path.Combine(ClientFolderPath, HabboAirExtensionsOSXPatchName))
-                End If
-                If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
-                    Dim HabboAirExtensionsWindowsPatchName = "HabboAirExtensionsWindowsPatch.zip"
-                    Await Task.Run(Sub() CopyEmbeddedAsset(HabboAirExtensionsWindowsPatchName, ClientFolderPath))
-                    Await Task.Run(Sub() UnzipFile(Path.Combine(ClientFolderPath, HabboAirExtensionsWindowsPatchName), ClientFolderPath, True))
-                    File.Delete(Path.Combine(ClientFolderPath, HabboAirExtensionsWindowsPatchName))
-                End If
-            End If
+            '(AIR Extensions will remain disabled until further notice)
+            'If IO.File.ReadAllText(Path.Combine(ClientFolderPath, "META-INF", "AIR", "application.xml")).Contains("<extensions>") Then
+            '    If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
+            '        Dim HabboAirExtensionsOSXPatchName = "HabboAirExtensionsOSXPatch.zip"
+            '        Await Task.Run(Sub() CopyEmbeddedAsset(HabboAirExtensionsOSXPatchName, ClientFolderPath))
+            '        Await Task.Run(Sub() UnzipFile(Path.Combine(ClientFolderPath, HabboAirExtensionsOSXPatchName), ClientFolderPath, True))
+            '        File.Delete(Path.Combine(ClientFolderPath, HabboAirExtensionsOSXPatchName))
+            '    End If
+            '    If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
+            '        Dim HabboAirExtensionsWindowsPatchName = "HabboAirExtensionsWindowsPatch.zip"
+            '        Await Task.Run(Sub() CopyEmbeddedAsset(HabboAirExtensionsWindowsPatchName, ClientFolderPath))
+            '        Await Task.Run(Sub() UnzipFile(Path.Combine(ClientFolderPath, HabboAirExtensionsWindowsPatchName), ClientFolderPath, True))
+            '        File.Delete(Path.Combine(ClientFolderPath, HabboAirExtensionsWindowsPatchName))
+            '    End If
+            'End If
 
             Dim AirCustomLicensePath = Path.Combine(ClientFolderPath, "license.txt")
             If IO.File.Exists(AirCustomLicensePath) Then
@@ -549,7 +563,7 @@ Partial Public Class MainWindow : Inherits Window
             End If
 
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) AndAlso Singleton.GetCurrentInstance().ClientAirVersion = "old" Then
-                ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 50) 'OSX is limited to AIR version 50.2.3.8 to improve performance and provide compatibility with OSX 10.12+, so the swf version will be forced to 50
+                ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 50) 'OSX old is limited to AIR version 50.2.3.8 to improve performance and provide compatibility with OSX 10.12+, so the swf version will be forced to 50
             Else
                 ReplaceSwfVersion(Path.Combine(ClientFolderPath, "HabboAir.swf"), 51) 'OSX Tahoe and later needs AIR 51+ to avoid keyboard shortcuts bugs /// 'Windows and Linux works with AIR 51+
             End If
@@ -564,17 +578,8 @@ Partial Public Class MainWindow : Inherits Window
                 For Each ExecutableFile In ExecutableFiles
                     If File.Exists(ExecutableFile) Then
                         MakeUnixExecutable(ExecutableFile)
-                    End If
-                Next
-                Dim CodesignFilesOrDirectories As New List(Of String) From {
-                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Frameworks", "DiscordRichPresence.framework"),
-                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Frameworks", "Adobe AIR.framework"),
-                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"),
-                    Path.Combine(ClientFolderPath, "Habbo.app")
-                }
-                For Each CodesignFileOrDirectory In CodesignFilesOrDirectories
-                    If File.Exists(CodesignFileOrDirectory) OrElse Directory.Exists(CodesignFileOrDirectory) Then
-                        CodesignFile(CodesignFileOrDirectory)
+                        RemoveExtendedAttributes(ExecutableFile)
+                        CodesignFile(ExecutableFile)
                     End If
                 Next
             ElseIf RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False Then
@@ -679,9 +684,11 @@ Partial Public Class MainWindow : Inherits Window
             OriginalXmlVersionNumber = "1.0"
             OriginalXmlExtensionsNode = Nothing
         End If
-        If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False AndAlso RuntimeInformation.IsOSPlatform(OSPlatform.OSX) = False Then
-            OriginalXmlExtensionsNode = Nothing 'In the future, AIR extensions support for Linux, if possible, should be added.
-        End If
+        '(AIR Extensions will remain disabled until further notice)
+        OriginalXmlExtensionsNode = Nothing
+        'If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) = False AndAlso RuntimeInformation.IsOSPlatform(OSPlatform.OSX) = False Then
+        '    OriginalXmlExtensionsNode = Nothing 'In the future, AIR extensions support for Linux, if possible, should be added.
+        'End If
         xmlDoc = XDocument.Load(NewXmlPath)
         xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "versionLabel").Value = OriginalXmlVersionNumber ' Reemplaza con el nuevo valor
         xmlDoc.Root.Elements.First(Function(x) x.Name.LocalName = "versionNumber").Value = OriginalXmlVersionNumber ' Reemplaza con el nuevo valor
@@ -697,11 +704,6 @@ Partial Public Class MainWindow : Inherits Window
         End If
         renderMode.Value = Singleton.GetCurrentInstance().ClientRenderMode
 
-        'If OriginalXmlExtensionsNode IsNot Nothing Then
-        '    Dim NewXmlNamespace As XNamespace = xmlDoc.Root.Name.Namespace
-        '    xmlDoc.Root.Add(New XElement(NewXmlNamespace + OriginalXmlExtensionsNode.Name.LocalName, OriginalXmlExtensionsNode.Elements().Select(Function(e) New XElement(NewXmlNamespace + e.Name.LocalName, e.Value))))
-        'End If
-
         If OriginalXmlExtensionsNode IsNot Nothing Then
             Dim ns As XNamespace = xmlDoc.Root.Name.Namespace
             Dim existingExtensions = xmlDoc.Root.Elements().FirstOrDefault(Function(x) x.Name.LocalName = "extensions")
@@ -712,7 +714,6 @@ Partial Public Class MainWindow : Inherits Window
                 existingExtensions.ReplaceWith(newExtensions)
             End If
         End If
-
 
         xmlDoc.Save(OriginalXmlPath)
         File.Delete(NewXmlPath)
@@ -861,6 +862,9 @@ Partial Public Class MainWindow : Inherits Window
         Skip(ClientsToKeep)
             For Each Folder In FoldersToDelete
                 Try
+                    If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
+                        Await KillProcessByPathAsync(Path.Combine(Folder, "Habbo.exe"))
+                    End If
                     Directory.Delete(Folder, True)
                 Catch ex As Exception
                     SomethingFailed = true
@@ -1095,6 +1099,9 @@ End Try
             Dim ClientsDirectory = GetPossibleClientPath("")
             For Each ClientVersionFolder In Directory.GetDirectories(ClientsDirectory)
                 Try
+                    If RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
+                        KillProcessByPath(Path.Combine(ClientVersionFolder, "Habbo.exe"))
+                    End If
                     Directory.Delete(ClientVersionFolder, True)
                     If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" = False Then
                         RemoveInstallation(New DirectoryInfo(ClientVersionFolder).Name, "air")
@@ -1154,6 +1161,48 @@ End Try
             Return False
         End Try
     End Function
+
+    <DllImport("kernel32.dll", CharSet:=CharSet.Unicode, SetLastError:=True)>
+    Private Shared Function QueryFullProcessImageName(hProcess As IntPtr, dwFlags As Integer, lpExeName As StringBuilder, ByRef lpdwSize As Integer) As Boolean
+    End Function
+
+    Public Async Function KillProcessByPathAsync(exePath As String) As Task
+        For Each proc In Process.GetProcesses()
+            Try
+                Dim path As New StringBuilder(1024)
+                Dim size = path.Capacity
+
+                If QueryFullProcessImageName(proc.Handle, 0, path, size) AndAlso
+               String.Equals(path.ToString(), exePath, StringComparison.OrdinalIgnoreCase) Then
+
+                    proc.Kill(entireProcessTree:=True)
+                    Await proc.WaitForExitAsync()
+                End If
+            Catch
+            Finally
+                proc.Dispose()
+            End Try
+        Next
+    End Function
+
+    Public Sub KillProcessByPath(exePath As String)
+        For Each proc In Process.GetProcesses()
+            Try
+                Dim path As New StringBuilder(1024)
+                Dim size = path.Capacity
+
+                If QueryFullProcessImageName(proc.Handle, 0, path, size) AndAlso
+               String.Equals(path.ToString(), exePath, StringComparison.OrdinalIgnoreCase) Then
+
+                    proc.Kill(entireProcessTree:=True)
+                    proc.WaitForExit()
+                End If
+            Catch
+            Finally
+                proc.Dispose()
+            End Try
+        Next
+    End Sub
 
     Public Sub FixWindowsTLS()
         Try
