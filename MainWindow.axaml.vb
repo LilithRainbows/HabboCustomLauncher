@@ -539,6 +539,8 @@ Partial Public Class MainWindow : Inherits Window
                 End If
             End If
 
+            Directory.CreateDirectory(Path.Combine(ClientFolderPath, "META-INF", "AIR")) 'Ensure this directory exists to prevent errors if the requested client does not contain it (e.g., AirPlus)
+
             UpdateAirApplicationXML(IsFromPostInstall:=False)
 
             '(AIR Extensions will remain disabled until further notice)
