@@ -52,7 +52,7 @@ Partial Public Class MainWindow : Inherits Window
     Public LauncherShortcutOSXPatchName As String = "LauncherShortcutOSXPatch.zip"
     Public AirPlusClientURL = "https://github.com/LilithRainbows/HabboAirPlus/releases/download/latest/HabboAir.swf"
     Private LauncherUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
-    Private LauncherVersion = "35"
+    Private LauncherVersion = "36"
 
     Sub New()
         ' This call is required by the designer
@@ -228,7 +228,6 @@ Partial Public Class MainWindow : Inherits Window
             End If
         End If
     End Function
-
 
     Public Async Function GetClipboardText() As Task(Of String)
         Try
@@ -413,7 +412,7 @@ Partial Public Class MainWindow : Inherits Window
     Sub CodesignFile(filePath As String)
         Dim p As New Process()
         p.StartInfo.FileName = "/usr/bin/codesign"
-        p.StartInfo.Arguments = $"--force --timestamp=none --sign - ""{filePath}"""
+        p.StartInfo.Arguments = $"--force --deep --sign - ""{filePath}"""
         p.StartInfo.UseShellExecute = False
         p.StartInfo.CreateNoWindow = True
         p.Start()
@@ -573,13 +572,10 @@ Partial Public Class MainWindow : Inherits Window
             If RuntimeInformation.IsOSPlatform(OSPlatform.OSX) Then
                 FixOSXClientStructure()
                 Dim ExecutableFiles As New List(Of String) From {
-                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Frameworks", "DiscordRichPresence.framework", "Versions", "A", "DiscordRichPresence"),
-                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Frameworks", "Adobe AIR.framework", "Versions", "1.0", "Adobe AIR"),
-                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"),
-                    Path.Combine(ClientFolderPath, "Habbo.app")
+                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo")
                 }
                 For Each ExecutableFile In ExecutableFiles
-                    If File.Exists(ExecutableFile) OrElse Directory.Exists(ExecutableFile) Then
+                    If File.Exists(ExecutableFile) Then
                         MakeUnixExecutable(ExecutableFile)
                         RemoveExtendedAttributes(ExecutableFile)
                         CodesignFile(ExecutableFile)
