@@ -575,10 +575,11 @@ Partial Public Class MainWindow : Inherits Window
                 Dim ExecutableFiles As New List(Of String) From {
                     Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Frameworks", "DiscordRichPresence.framework", "Versions", "A", "DiscordRichPresence"),
                     Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "Frameworks", "Adobe AIR.framework", "Versions", "1.0", "Adobe AIR"),
-                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo")
+                    Path.Combine(ClientFolderPath, "Habbo.app", "Contents", "MacOS", "Habbo"),
+                    Path.Combine(ClientFolderPath, "Habbo.app")
                 }
                 For Each ExecutableFile In ExecutableFiles
-                    If File.Exists(ExecutableFile) Then
+                    If File.Exists(ExecutableFile) OrElse Directory.Exists(ExecutableFile) Then
                         MakeUnixExecutable(ExecutableFile)
                         RemoveExtendedAttributes(ExecutableFile)
                         CodesignFile(ExecutableFile)
