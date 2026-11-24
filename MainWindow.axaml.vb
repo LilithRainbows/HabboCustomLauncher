@@ -511,11 +511,12 @@ Partial Public Class MainWindow : Inherits Window
 
 
             Dim ClientUrl = CurrentClientUrls.FlashWindowsUrl
-            Dim umaka = DownloadRemoteFileAsync(ClientUrl, ClientFilePath)
-            Do Until umaka.IsCompleted
+            Dim DownloadTask = DownloadRemoteFileAsync(ClientUrl, ClientFilePath)
+            Do Until DownloadTask.IsCompleted
                 StartNewInstanceButton.Text = DownloadingClientHint & " (" & CurrentDownloadProgress & "%)"
                 Await Task.Delay(100)
             Loop
+            Await DownloadTask
             StartNewInstanceButton.Text = AppTranslator.ExtractingClient(CurrentLanguageInt)
 
 
@@ -735,28 +736,29 @@ Partial Public Class MainWindow : Inherits Window
         CurrentDownloadProgress = 0
         HttpClient.DefaultRequestHeaders.Clear()
         HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd(LauncherUserAgent)
-        Dim Response = Await HttpClient.GetAsync(RemoteFileUrl, HttpCompletionOption.ResponseHeadersRead)
-        Dim totalSize = Response.Content.Headers.ContentLength
-        Dim downloaded As Long = 0
-        Using stream = Await Response.Content.ReadAsStreamAsync()
-            Using file = New FileStream(DownloadFilePath, FileMode.Create, FileAccess.Write)
-                Dim buffer(8191) As Byte
-                Dim bytesRead As Integer
-                Do
-                    Dim readTask = stream.ReadAsync(buffer, 0, buffer.Length)
-                    If Await Task.WhenAny(readTask, Task.Delay(10000)) IsNot readTask Then
-                        Throw New TimeoutException()
-                    End If
-                    bytesRead = Await readTask
-                    If bytesRead > 0 Then
-                        Await file.WriteAsync(buffer, 0, bytesRead)
-                        downloaded += bytesRead
-                        If totalSize.HasValue Then
-                            CurrentDownloadProgress =
-                            CInt(downloaded / totalSize.Value * 100)
+        Using Response = Await HttpClient.GetAsync(RemoteFileUrl, HttpCompletionOption.ResponseHeadersRead)
+            Response.EnsureSuccessStatusCode()
+            Dim totalSize = Response.Content.Headers.ContentLength
+            Dim downloaded As Long = 0
+            Using stream = Await Response.Content.ReadAsStreamAsync()
+                Using file = New FileStream(DownloadFilePath, FileMode.Create, FileAccess.Write)
+                    Dim buffer(8191) As Byte
+                    Dim bytesRead As Integer
+                    Do
+                        Dim readTask = stream.ReadAsync(buffer, 0, buffer.Length)
+                        If Await Task.WhenAny(readTask, Task.Delay(10000)) IsNot readTask Then
+                            Throw New TimeoutException()
                         End If
-                    End If
-                Loop While bytesRead > 0
+                        bytesRead = Await readTask
+                        If bytesRead > 0 Then
+                            Await file.WriteAsync(buffer, 0, bytesRead)
+                            downloaded += bytesRead
+                            If totalSize.HasValue Then
+                                CurrentDownloadProgress = CInt(downloaded / totalSize.Value * 100)
+                            End If
+                        End If
+                    Loop While bytesRead > 0
+                End Using
             End Using
         End Using
         Return DownloadFilePath
