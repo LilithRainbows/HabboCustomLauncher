@@ -22,6 +22,7 @@ Partial Public Class LoadingWindow : Inherits Window
     Private Async Sub LoadingWindow_Loaded(sender As Object, e As RoutedEventArgs) Handles Me.Loaded
         Await Task.Yield() 'Ensure window load
         IsFullyLoaded = True
+        If InstalledLauncherVersion > 0 AndAlso IsVisible Then Await CheckLauncherUpdateAsync()
     End Sub
 
     ' Auto-wiring does not work for VB, so do it manually
@@ -232,6 +233,11 @@ $")"
     End Sub
 
     Private Sub LoadingWindow_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
+        If InstalledLauncherVersion > 0 Then
+            UpdateCancellation?.Cancel()
+            IsFullyLoaded = False
+            Return
+        End If
         If MainMenuRequested Then
             GetMainWindow.Show()
             GetMainWindow.LoadingWindowChild = Nothing

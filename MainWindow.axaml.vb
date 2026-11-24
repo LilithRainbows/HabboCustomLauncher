@@ -37,6 +37,7 @@ Partial Public Class MainWindow : Inherits Window
     Private WithEvents LoginCodeButton2 As CustomButton
     Private WithEvents ChangeUpdateSourceButton As CustomButton
     Private WithEvents ChangeUpdateSourceButton2 As CustomButton
+    Private WithEvents LauncherUpdatesButton As CustomButton
     Private WithEvents HabboLogoButton As Image
     Private WithEvents AboutButton As CustomButton
     Private WithEvents SettingsButton As CustomButton
@@ -83,6 +84,9 @@ Partial Public Class MainWindow : Inherits Window
         LoginCodeButton2 = Window.FindNameScope.Find("LoginCodeButton2")
         ChangeUpdateSourceButton = Window.FindNameScope.Find("ChangeUpdateSourceButton")
         ChangeUpdateSourceButton2 = Window.FindNameScope.Find("ChangeUpdateSourceButton2")
+        LauncherUpdatesButton = Window.FindControl(Of CustomButton)("LauncherUpdatesButton")
+        LauncherUpdatesButton.Text = LauncherUpdateText.Check(CurrentLanguageInt)
+        LauncherUpdatesButton.IsVisible = OperatingSystem.IsWindows()
         HabboLogoButton = Window.FindNameScope.Find("HabboLogoButton")
         AboutButton = Window.FindNameScope.Find("AboutButton")
         SettingsButton = Window.FindNameScope.Find("SettingsButton")
@@ -1057,6 +1061,12 @@ End Try
             End If
         Catch
         End Try
+    End Sub
+
+    Private Async Sub LauncherUpdatesButton_Click(sender As Object, e As EventArgs) Handles LauncherUpdatesButton.Click
+        Dim dialog As New LoadingWindow()
+        dialog.ConfigureLauncherUpdates(Integer.Parse(LauncherVersion, CultureInfo.InvariantCulture))
+        Await dialog.ShowDialog(Window)
     End Sub
 
     Private Sub RefreshUpdateSourceText()
