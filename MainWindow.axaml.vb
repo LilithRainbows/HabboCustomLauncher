@@ -232,6 +232,7 @@ Partial Public Class MainWindow : Inherits Window
                 Return "HabboAirOSXPatch_old.zip"
             End If
         End If
+        Throw New PlatformNotSupportedException("No AIR client patch is available for this operating system.")
     End Function
 
     Public Async Function GetClipboardText() As Task(Of String)
@@ -258,7 +259,7 @@ Partial Public Class MainWindow : Inherits Window
         Return ""
     End Function
 
-    Private Function DisplayCurrentUserOnFooter() As String
+    Private Sub DisplayCurrentUserOnFooter()
         If String.IsNullOrWhiteSpace(CurrentLoginCode.Username) Then
             DisplayLauncherVersionOnFooter()
         Else
@@ -269,16 +270,17 @@ Partial Public Class MainWindow : Inherits Window
             End If
             FooterButton.Text = AppTranslator.PlayingAs(CurrentLanguageInt) & " " & FinalUsername
         End If
-    End Function
+    End Sub
 
-    Private Sub StartNewInstanceButton_Click(sender As Object, e As RoutedEventArgs) Handles StartNewInstanceButton.Click
+    Private Async Sub StartNewInstanceButton_Click(sender As Object, e As RoutedEventArgs) Handles StartNewInstanceButton.Click
         If StartNewInstanceButton.Text = AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt) Then
             StartNewInstanceButton.IsButtonDisabled = True
             StartNewInstanceButton2.IsButtonDisabled = True
             ChangeUpdateSourceButton.IsButtonDisabled = True
             ChangeUpdateSourceButton2.IsButtonDisabled = True
             FocusManager.ClearFocus()
-            CheckUpdatesAndLaunchClient()
+            Await CheckUpdatesAndLaunchClient()
+            Return
         End If
         'If StartNewInstanceButton.Text.StartsWith(AppTranslator.UpdateClientVersion(CurrentLanguageInt)) Then
         '    StartNewInstanceButton.IsButtonDisabled = True
@@ -302,11 +304,13 @@ Partial Public Class MainWindow : Inherits Window
             ChangeUpdateSourceButton.IsButtonDisabled = True
             ChangeUpdateSourceButton2.IsButtonDisabled = True
             FocusManager.ClearFocus()
-            CheckUpdatesAndLaunchClient()
+            Await CheckUpdatesAndLaunchClient()
+            Return
         End If
     End Sub
 
     Public Async Function LaunchClient() As Task
+        Dim failure As Exception = Nothing
         Try
             StartNewInstanceButton.Text = AppTranslator.CleaningClients(CurrentLanguageInt)
             Await CleanDeprecatedClients()
@@ -356,8 +360,11 @@ Partial Public Class MainWindow : Inherits Window
             ChangeUpdateSourceButton.IsButtonDisabled = False
             ChangeUpdateSourceButton2.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.CheckUpdatesAndLaunchClient(CurrentLanguageInt)
-            MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientLaunchError(CurrentLanguageInt), ex.Message)
+            failure = ex
         End Try
+        If failure IsNot Nothing Then
+            Await MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientLaunchError(CurrentLanguageInt), failure.Message)
+        End If
     End Function
 
     Public Async Function CleanRealClipboardLoginCode(CleanCurrentLoginCode As Boolean) As Task(Of Boolean)
@@ -402,6 +409,7 @@ Partial Public Class MainWindow : Inherits Window
         process.StartInfo.CreateNoWindow = True
         process.Start()
         process.WaitForExit()
+        Return process.ExitCode = 0
     End Function
 
     Sub RemoveExtendedAttributes(filePath As String)
@@ -498,6 +506,7 @@ Partial Public Class MainWindow : Inherits Window
 
 
     Public Async Function UpdateClient() As Task
+        Dim failure As Exception = Nothing
         Try
             Dim ClientFolderPath = GetPossibleClientPath(CurrentClientUrls.FlashWindowsVersion)
             Dim ClientFilePath = Path.Combine(ClientFolderPath, "ClientDownload.zip")
@@ -604,7 +613,7 @@ Partial Public Class MainWindow : Inherits Window
                 AddOrUpdateInstallation(CurrentClientUrls.FlashWindowsVersion, ClientFolderPath, "air", 0)
             End If
 
-            LaunchClient()
+            Await LaunchClient()
 
             'StartNewInstanceButton.IsButtonDisabled = False
             'StartNewInstanceButton2.IsButtonDisabled = False
@@ -619,8 +628,11 @@ Partial Public Class MainWindow : Inherits Window
             ChangeUpdateSourceButton2.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt)
             'Clipboard.SetTextAsync(ex.ToString)
-            MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientUpdateError(CurrentLanguageInt), ex.Message)
+            failure = ex
         End Try
+        If failure IsNot Nothing Then
+            Await MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientUpdateError(CurrentLanguageInt), failure.Message)
+        End If
     End Function
 
     Public Sub FixOSXClientStructure()
@@ -917,6 +929,7 @@ End Try
     End Function
 
     Public Async Function CheckUpdatesAndLaunchClient() As Task
+        Dim failure As Exception = Nothing
         StartNewInstanceButton.IsButtonDisabled = True
         StartNewInstanceButton2.IsButtonDisabled = True
         ChangeUpdateSourceButton.IsButtonDisabled = True
@@ -945,9 +958,9 @@ End Try
             IsClientUpdated = IsClientVersionExists()
 
             If IsClientUpdated Then 'Abria que verificar swf o mejor aun que exista un archivo READY para asegurarse que se completo todo el proceso de modificacion
-                LaunchClient()
+                Await LaunchClient()
             Else
-                UpdateClient()
+                Await UpdateClient()
             End If
 
         Catch ex As Exception
@@ -957,12 +970,15 @@ End Try
             ChangeUpdateSourceButton.IsButtonDisabled = False
             ChangeUpdateSourceButton2.IsButtonDisabled = False
             StartNewInstanceButton.Text = AppTranslator.RetryClientUpdatesCheck(CurrentLanguageInt)
-            MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientUpdatesCheckError(CurrentLanguageInt), ex.Message)
+            failure = ex
         End Try
         'StartNewInstanceButton.IsButtonDisabled = False
         'StartNewInstanceButton2.IsButtonDisabled = False
         'ChangeUpdateSourceButton.IsButtonDisabled = False
         'ChangeUpdateSourceButton2.IsButtonDisabled = False
+        If failure IsNot Nothing Then
+            Await MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientUpdatesCheckError(CurrentLanguageInt), failure.Message)
+        End If
     End Function
 
     Public Shared Function GetAppDataPath() As String
@@ -1049,11 +1065,11 @@ End Try
         End Try
     End Sub
 
-    Private Sub LoginCodeButton2_Click(sender As Object, e As EventArgs) Handles LoginCodeButton2.Click
+    Private Async Sub LoginCodeButton2_Click(sender As Object, e As EventArgs) Handles LoginCodeButton2.Click
         Try
             If StartNewInstanceButton.IsButtonDisabled = False Then
                 If CurrentLoginCode.IsFromFakeClipboard = False Then
-                    CleanRealClipboardLoginCode(True)
+                    Await CleanRealClipboardLoginCode(True)
                 Else
                     FakeClipboardContent = ""
                     CurrentLoginCode = Nothing
@@ -1111,8 +1127,9 @@ End Try
         'UpdateClientButtonStatus()
     End Sub
 
-    Private Sub StartNewInstanceButton2_Click(sender As Object, e As EventArgs) Handles StartNewInstanceButton2.Click
+    Private Async Sub StartNewInstanceButton2_Click(sender As Object, e As EventArgs) Handles StartNewInstanceButton2.Click
         Dim ErrorsList As New List(Of String)
+        Dim noClients As Boolean
         Try
             Dim ClientsDirectory = GetPossibleClientPath("")
             For Each ClientVersionFolder In Directory.GetDirectories(ClientsDirectory)
@@ -1130,17 +1147,18 @@ End Try
             Next
             Directory.Delete(ClientsDirectory, True)
         Catch ex As Exception
-            If TypeOf ex Is DirectoryNotFoundException Then
-                MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), AppTranslator.ClientsDeleteEmpty(CurrentLanguageInt))
-                Return
-            End If
-            ErrorsList.Add(ex.GetType.Name & ": " & ex.Message)
+            noClients = TypeOf ex Is DirectoryNotFoundException
+            If Not noClients Then ErrorsList.Add(ex.GetType.Name & ": " & ex.Message)
         End Try
+        If noClients Then
+            Await MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), AppTranslator.ClientsDeleteEmpty(CurrentLanguageInt))
+            Return
+        End If
         ErrorsList = ErrorsList.Distinct(StringComparer.OrdinalIgnoreCase).ToList()
         If ErrorsList.Any Then
-            MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientsDeleteError(CurrentLanguageInt), String.Join(Environment.NewLine, ErrorsList))
+            Await MsgBox(AppTranslator.ErrorDebugClipboardHint(CurrentLanguageInt), AppTranslator.ClientsDeleteError(CurrentLanguageInt), String.Join(Environment.NewLine, ErrorsList))
         Else
-            MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), AppTranslator.ClientsDeleteOk(CurrentLanguageInt))
+            Await MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), AppTranslator.ClientsDeleteOk(CurrentLanguageInt))
         End If
     End Sub
 
@@ -1408,12 +1426,12 @@ End Try
         End If
     End Sub
 
-    Private Sub ChangeUpdateSourceButton2_Click(sender As Object, e As EventArgs) Handles ChangeUpdateSourceButton2.Click
+    Private Async Sub ChangeUpdateSourceButton2_Click(sender As Object, e As EventArgs) Handles ChangeUpdateSourceButton2.Click
         Dim ClientHint As String = AppTranslator.ClassicAirClientHint(CurrentLanguageInt)
         If Singleton.GetCurrentInstance().UpdateSource = "AIR_Plus" Then
             ClientHint = AppTranslator.AirPlusClientHint(CurrentLanguageInt)
         End If
-        MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), ClientHint)
+        Await MsgBox(AppTranslator.GenericInfo(CurrentLanguageInt), ClientHint)
     End Sub
 
     Private Sub TitleBarLabel_PointerPressed(sender As Object, e As Input.PointerPressedEventArgs) Handles TitleBarLabel.PointerPressed
@@ -1490,9 +1508,9 @@ End Try
         'End If
     End Sub
 
-    Private Sub MainWindow_Activated(sender As Object, e As EventArgs) Handles Me.Activated
+    Private Async Sub MainWindow_Activated(sender As Object, e As EventArgs) Handles Me.Activated
         If LoadingWindowChild IsNot Nothing Then
-            EnsureWindowFocus(LoadingWindowChild)
+            Await EnsureWindowFocus(LoadingWindowChild)
         End If
     End Sub
 
@@ -1604,12 +1622,12 @@ End Try
 
     End Function
 
-    Private Sub AboutButton_Click(sender As Object, e As EventArgs) Handles AboutButton.Click
-        MsgBox("About", "Launcher version: " & LauncherVersion & vbNewLine & "Edited by Lilith." & vbNewLine & "Sulake Oy. All rights reserved." & vbNewLine & "This project is not endorsed by or affiliated with Sulake Oy.")
+    Private Async Sub AboutButton_Click(sender As Object, e As EventArgs) Handles AboutButton.Click
+        Await MsgBox("About", "Launcher version: " & LauncherVersion & Environment.NewLine & "Edited by Lilith." & Environment.NewLine & "Sulake Oy. All rights reserved." & Environment.NewLine & "This project is not endorsed by or affiliated with Sulake Oy.")
     End Sub
 
-    Private Sub SettingsButton_Click(sender As Object, e As EventArgs) Handles SettingsButton.Click
-        OpenSettingsDialog()
+    Private Async Sub SettingsButton_Click(sender As Object, e As EventArgs) Handles SettingsButton.Click
+        Await OpenSettingsDialog()
     End Sub
 
     Private Sub AboutButton_PointerEntered(sender As Object, e As Input.PointerEventArgs) Handles AboutButton.PointerEntered
