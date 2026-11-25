@@ -11,6 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Tests/**/*.vb" />
+    <InternalsVisibleTo Include="HabboCustomLauncher.UpdaterTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="Assets\habbo-footer-2.png" />
     <None Remove="Assets\habbo-logo-big-2.png" />
     <None Remove="Assets\HabboAirPlusPatch.zip" />

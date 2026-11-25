@@ -220,6 +220,10 @@ $")"
     End Function
 
     Private Sub MainMenuButton_Click(sender As Object, e As EventArgs) Handles MainMenuButton.Click
+        If InstalledLauncherVersion > 0 AndAlso DownloadInProgress Then
+            UpdateCancellation?.Cancel()
+            Return
+        End If
         MainMenuRequested = True
         Window.Close()
     End Sub
@@ -234,6 +238,7 @@ $")"
 
     Private Sub LoadingWindow_Closing(sender As Object, e As WindowClosingEventArgs) Handles Me.Closing
         If InstalledLauncherVersion > 0 Then
+            UpdateWindowClosing = True
             UpdateCancellation?.Cancel()
             IsFullyLoaded = False
             Return

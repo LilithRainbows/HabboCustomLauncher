@@ -38,6 +38,7 @@ Partial Public Class MainWindow : Inherits Window
     Private WithEvents ChangeUpdateSourceButton As CustomButton
     Private WithEvents ChangeUpdateSourceButton2 As CustomButton
     Private WithEvents LauncherUpdatesButton As CustomButton
+    Private LauncherUpdateDialogOpen As Boolean
     Private WithEvents HabboLogoButton As Image
     Private WithEvents AboutButton As CustomButton
     Private WithEvents SettingsButton As CustomButton
@@ -1064,9 +1065,15 @@ End Try
     End Sub
 
     Private Async Sub LauncherUpdatesButton_Click(sender As Object, e As EventArgs) Handles LauncherUpdatesButton.Click
-        Dim dialog As New LoadingWindow()
-        dialog.ConfigureLauncherUpdates(Integer.Parse(LauncherVersion, CultureInfo.InvariantCulture))
-        Await dialog.ShowDialog(Window)
+        If LauncherUpdateDialogOpen Then Return
+        LauncherUpdateDialogOpen = True
+        Try
+            Dim dialog As New LoadingWindow()
+            dialog.ConfigureLauncherUpdates(Integer.Parse(LauncherVersion, CultureInfo.InvariantCulture))
+            Await dialog.ShowDialog(Window)
+        Finally
+            LauncherUpdateDialogOpen = False
+        End Try
     End Sub
 
     Private Sub RefreshUpdateSourceText()

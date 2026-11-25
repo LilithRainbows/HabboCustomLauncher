@@ -2,8 +2,24 @@ name: Build HabboCustomLauncher
 
 on:
   workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
 
 jobs:
+  updater-tests:
+    name: Launcher updater tests
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '6.0.x'
+      - name: Run updater tests
+        run: dotnet run --project Tests/UpdaterTests.vbproj -c Release
+
   build:
     name: Build ${{ matrix.name }}
 
