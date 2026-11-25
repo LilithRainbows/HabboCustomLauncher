@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <RootNamespace>HabboCustomLauncher.UpdaterTests</RootNamespace>
+    <AssemblyName>HabboCustomLauncher.UpdaterTests</AssemblyName>
+    <OptionStrict>On</OptionStrict>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionInfer>On</OptionInfer>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../HabboCustomLauncher.vbproj" />
+    <PackageReference Include="Avalonia.Headless" Version="11.2.0" />
+  </ItemGroup>
+</Project>

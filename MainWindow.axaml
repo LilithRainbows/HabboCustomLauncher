@@ -33,6 +33,7 @@
 								<RowDefinition Height="Auto"/>
 								<RowDefinition Height="Auto"/>
 								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="Auto"/>
 							</Grid.RowDefinitions>
 							<Grid Grid.Row="0" Margin="0,0,0,10" Height="40">
 								<Grid.ColumnDefinitions>
@@ -58,6 +59,7 @@
 								<local:CustomButton x:Name="ChangeUpdateSourceButton" Grid.Column="0" Text="Current update source: AIR (Official)" BackColor="#990084" />
 								<local:CustomButton x:Name="ChangeUpdateSourceButton2" Grid.Column="1" Width="30" Icon="{StaticResource QuestionIconGeometry}" BackColor="#990084" Margin="5,0,0,0"/>
 							</Grid>
+							<local:CustomButton x:Name="LauncherUpdatesButton" Grid.Row="3" Height="40" Text="Check launcher updates" BackColor="#3F3F3F"/>
 						</Grid>
 					</Grid>
 					<Grid Grid.Row="2">
